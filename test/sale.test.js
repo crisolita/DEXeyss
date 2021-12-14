@@ -7,6 +7,12 @@ const {
 } = require("@openzeppelin/test-helpers");
 const { web3 } = require("@openzeppelin/test-helpers/src/setup");
 
+
+import chai, {expect} from 'chai';
+import {solidity} from 'ethereum-waffle';
+
+chai.use(solidity);
+
 // this function include the desimals
 toBN = (num) => web3.utils.toBN(num + "0".repeat(18));
 
@@ -35,7 +41,7 @@ contract("Sale", ([owner, user,admin1,admin2]) => {
     dateEndPhase =
     Number(await time.latest()) + 3600 /** the phase will last one hour */;
 
-    await sale.createPhase(true,min,price,discount,dateEndPhase,supply,25,{
+    const tx = await sale.createPhase(true,min,price,discount,dateEndPhase,supply,25,{
         from: owner,
       });
     
@@ -53,8 +59,9 @@ contract("Sale", ([owner, user,admin1,admin2]) => {
         maxSupply - supply,
         "Contract dicrease supply err"
       );
-  
-  });
+
+    });
+
 
   it("Errors creating phases", async function () {
     /// err 200% discount
@@ -276,5 +283,45 @@ contract("Sale", ([owner, user,admin1,admin2]) => {
         );
         });
 
-    });
+        it("Should recieve the purchase event and release event", async function () {
+          const discount = 505 /** 50.5% */,
+            maxSupply = toBN(10000),
+            price = 5 /** 1 ETH/BNB = 5 Tokens */,
+            min = 9;
+            supply = toBN(5000),
+            dateEndPhase =
+            Number(await time.latest()) + time.duration.days(10) /** the phase will last one hour */,
+            timeLock = 3600;
+        
+            await sale.createPhase(true,min,price,discount,dateEndPhase,supply,timeLock,{
+                from: owner,
+              });
+        
+            const id =0;
+        
+            const finalPrice = (10/price)*(
+                  (1000 - discount)/ 1000);
+          
+          const shop = await sale.buyToken(10,{from: user, value:toWei('10')});
+
+          await time.increase(time.duration.days(6));
+
+         const release = await sale.release(id, {from: user});
+          
+          // expect(release
+          //   ).to.emit(sale,"Claims")
+          //   .withArgs(user,id); 
+
+
+          //   expect(shop
+          //     ).to.emit(sale,"Purchase")
+          //     .withArgs(user,10,finalPrice,id); 
+
+
+          });
+
+           
+          
+      });
+
     
