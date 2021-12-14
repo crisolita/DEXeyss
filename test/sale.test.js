@@ -8,10 +8,6 @@ const {
 const { web3 } = require("@openzeppelin/test-helpers/src/setup");
 
 
-import chai, {expect} from 'chai';
-import {solidity} from 'ethereum-waffle';
-
-chai.use(solidity);
 
 // this function include the desimals
 toBN = (num) => web3.utils.toBN(num + "0".repeat(18));
@@ -153,7 +149,7 @@ contract("Sale", ([owner, user,admin1,admin2]) => {
 
 
   it("Should end the phase (supply out)", async function () {
-    const discount = 0,
+    const discount = 505,
     dateEndPhase = Number(await time.latest()) + time.duration.days(1),
     supply = toBN(2500),
     isPublic = true,
@@ -178,7 +174,7 @@ contract("Sale", ([owner, user,admin1,admin2]) => {
     await expectRevert(
       sale.buyToken(
         (await sale.phases(currentPhaseNumber)).supply,
-        { from: user, value: ethNeeded - 10 }
+        { from: user, value: ethNeeded - 1000 }
       ),
       "Not enough ETH/BNB"
     );
@@ -284,38 +280,32 @@ contract("Sale", ([owner, user,admin1,admin2]) => {
         });
 
         it("Should recieve the purchase event and release event", async function () {
-          const discount = 505 /** 50.5% */,
-            maxSupply = toBN(10000),
-            price = 5 /** 1 ETH/BNB = 5 Tokens */,
-            min = 9;
+          const maxSupply = toBN(10000),
+            price = 278934 /** 1 ETH/BNB = 5 Tokens */,
+            min = toBN('9');
             supply = toBN(5000),
             dateEndPhase =
             Number(await time.latest()) + time.duration.days(10) /** the phase will last one hour */,
             timeLock = 3600;
         
-            await sale.createPhase(true,min,price,discount,dateEndPhase,supply,timeLock,{
+            await sale.createPhase(true,min,price,0,dateEndPhase,supply,timeLock,{
                 from: owner,
               });
         
-            const id =0;
+            const id = toBN('0');
         
-            const finalPrice = (10/price)*(
-                  (1000 - discount)/ 1000);
+  
           
-          const shop = await sale.buyToken(10,{from: user, value:toWei('10')});
+          const shop = await sale.buyToken(toBN('10'),{from: user, value:toWei('10')});
+
+          expectEvent(shop, "Purchase",{_account:user,_amount:toBN('10'),_price: 'price',_id:id});
 
           await time.increase(time.duration.days(6));
 
          const release = await sale.release(id, {from: user});
-          
-          // expect(release
-          //   ).to.emit(sale,"Claims")
-          //   .withArgs(user,id); 
 
+          expectEvent(release, "Claims",{_id: id});
 
-          //   expect(shop
-          //     ).to.emit(sale,"Purchase")
-          //     .withArgs(user,10,finalPrice,id); 
 
 
           });

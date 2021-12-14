@@ -115,6 +115,14 @@ contract Sale is Ownable, Pausable {
         _;
 
     }
+
+    modifier isOver() {
+        require(
+            phases[currentPhase].over == false,
+            "This phase is over, wait for the next"
+        );
+        _;
+    }
     /// @notice add a phase to mapping
     function createPhase(
         bool _isPublic,
@@ -174,7 +182,7 @@ contract Sale is Ownable, Pausable {
         );
     }
 
-    function cancelPhase() external onlyOwner {
+    function cancelPhase() external onlyOwner isOver{
         phases[currentPhase].over = true;
         emit PhaseOver(true);
     }
@@ -199,16 +207,13 @@ contract Sale is Ownable, Pausable {
         payable
         whenNotPaused
         isPublic
+        isOver
     {
         if (block.timestamp > phases[currentPhase].endAt) {
             phases[currentPhase].over = true;
             emit PhaseOver(true);
         }
 
-        require(
-            phases[currentPhase].over == false,
-            "This phase is over, wait for the next"
-        );
         require(
             phases[currentPhase].supply >= _tokenAmount,
             "Not enought supply"
@@ -220,10 +225,16 @@ contract Sale is Ownable, Pausable {
         );
 
         // calculation: tokens / (price * (100 - discount) / 100)
+    
+        uint256 finalPrice = phases[currentPhase].price;
 
-        uint256 finalPrice = (_tokenAmount /
+
+        if (phases[currentPhase].discount!= 0 ) {
+             finalPrice = (_tokenAmount /
             (phases[currentPhase].price *
                 (1000 - phases[currentPhase].discount))) / 1000;
+        } 
+       
         require(finalPrice <= msg.value, "Not enough ETH/BNB");
         TokenTimelock usertime = new TokenTimelock(IERC20(tokenAddress),msg.sender,block.timestamp + phases[currentPhase].time);
         ERC20(tokenAddress).transfer(address(usertime),_tokenAmount);
@@ -239,6 +250,15 @@ contract Sale is Ownable, Pausable {
         }
 
 
+
+    }
+
+
+    /// @notice a function to make stake 
+    function makeStake(uint256 _amount) public {
+        require(_amount>=100,"Not enough tokens to stake");
+        ERC20(tokenAddress).transfer(address(this), _amount);
+        
 
     }
 
