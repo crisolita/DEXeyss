@@ -381,29 +381,7 @@ contract("Sale", ([owner, user,admin1,admin2]) => {
         
                 });
     
-                it("User can stake his tokens and claim rewards", async function () {
-          
-                  const discount = 0,
-                  dateEndPhase = Number(await time.latest()) + time.duration.days(5),
-                  supply = toBN(2500),
-                  isPublic = true,
-                  min = toBN(1),
-                  price = 10;
-              
-                  await sale.createPhase(isPublic,min,price, discount,dateEndPhase,supply,6800,{from: owner});
-              
-                  amountOfTokens = toBN(3);
-              
-    
-                  await sale.buyToken(amountOfTokens,{from: user, value:toWei('10')});
-                      
-                  //increase time to end the timeLock
-                  await time.increase(8000);
-    
-                // release the tokens to user
-                  await sale.release(0,{from:user});
-    
-                // the owner created the stake 
+                it("The owner can deploy and update the stake", async function () {
 
                 const _stakingToken = token.address,
                 _rewardsAmount = 50,
@@ -411,9 +389,21 @@ contract("Sale", ([owner, user,admin1,admin2]) => {
 
                 await factory.deploy(_stakingToken, _rewardsAmount,_rewardsDuration);
     
-                const sat =  await factory.info;
+                const stk = await factory.stakingRewardsInfoByStakingToken(token.address);
 
-          
+                expect(stk.duration.toString()).to.equal('8000');
+                expect(stk.rewardAmount.toString()).to.equal('50');
+                
+                await factory.update(_stakingToken,80,9000);
+
+                const stk2 = await factory.stakingRewardsInfoByStakingToken(token.address);
+                
+                expect(stk2.duration.toString()).to.equal('9000');
+                expect(stk2.rewardAmount.toString()).to.equal('80');
+
+
+            
+                            
                   });
   
 
