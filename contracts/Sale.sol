@@ -1,11 +1,19 @@
 //SPDX-License-Identifier: MIT
-pragma solidity ^0.8.0;
+pragma solidity ^0.8.7;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/security/Pausable.sol";
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "hardhat/console.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/TokenTimelock.sol";
+
+interface IStakingRewardsFactory {
+    function deploy(address stakingToken, uint rewardAmount, uint256 rewardsDuration) external;
+
+     function update(address stakingToken, uint rewardAmount, uint256 rewardsDuration) external;
+
+    function notifyRewardAmount(address stakingToken) external;
+}
 
 /// @title Sale
 /// @author crisolita
@@ -15,10 +23,11 @@ contract Sale is Ownable, Pausable {
     /// until amount N of token sold out or reaching a date or time is over
     /// @dev a phase is always needed to mint
 
-    
+
+    IStakingRewardsFactory  factory;
 
     struct Phase {
-        // bool is the phase public
+        // bool is the phase publici
         bool isPublic;
         // uint minimum amount of token
         uint256 minimunEntry;
@@ -116,13 +125,6 @@ contract Sale is Ownable, Pausable {
 
     }
 
-    modifier isOver() {
-        require(
-            phases[currentPhase].over == false,
-            "This phase is over, wait for the next"
-        );
-        _;
-    }
     /// @notice add a phase to mapping
     function createPhase(
         bool _isPublic,
@@ -131,7 +133,7 @@ contract Sale is Ownable, Pausable {
         uint256 _discount,
         uint256 _endAt,
         uint256 _supply,
-        uint256 _time
+        uint256 _timeLock
     ) external onlyOwner {
         emit PhaseCreated(
             totalPhase,
@@ -164,7 +166,7 @@ contract Sale is Ownable, Pausable {
 
         p.over = false;
 
-        p.time = _time;
+        p.time = _timeLock;
 
         require(supply >= _supply, "Not enough supply to mint");
         /// supply will decrease with each phase
@@ -182,7 +184,11 @@ contract Sale is Ownable, Pausable {
         );
     }
 
-    function cancelPhase() external onlyOwner isOver{
+    function cancelPhase() external onlyOwner{
+          require(
+            phases[currentPhase].over == false,
+            "This phase is over, wait for the next"
+        );
         phases[currentPhase].over = true;
         emit PhaseOver(true);
     }
@@ -207,12 +213,16 @@ contract Sale is Ownable, Pausable {
         payable
         whenNotPaused
         isPublic
-        isOver
     {
         if (block.timestamp > phases[currentPhase].endAt) {
             phases[currentPhase].over = true;
             emit PhaseOver(true);
         }
+
+          require(
+            phases[currentPhase].over == false,
+            "This phase is over, wait for the next"
+        );
 
         require(
             phases[currentPhase].supply >= _tokenAmount,
@@ -254,13 +264,17 @@ contract Sale is Ownable, Pausable {
     }
 
 
-    /// @notice a function to make stake 
-    function makeStake(uint256 _amount) public {
-        require(_amount>=100,"Not enough tokens to stake");
-        ERC20(tokenAddress).transfer(address(this), _amount);
-        
-
+    /// @notice a function to update stake 
+    function updateStake(address _stakingToken, uint256 _rewardAmount,uint256 _rewardsDuration) public onlyOwner {
+        factory.update(_stakingToken,_rewardAmount,_rewardsDuration);
     }
+
+    ///@notice a user can stake his tokens
+
+    // function stakeMyToken(address _stakingToken) public {
+    //  factory.stakingRewardsInfoByStakingToken[_stakingToken];
+    // }
+
 
  
     /// @notice get ongoing phase or the last phase over

@@ -8,8 +8,9 @@ import "@openzeppelin/contracts/utils/math/SafeMath.sol";
 import "@openzeppelin/contracts/utils/math/Math.sol";
 import "@openzeppelin/contracts/utils/Address.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+import "hardhat/console.sol";
 
-import "./stakeRewards.sol";
+import "./StakingRewards.sol";
 import "./IUniswapV2ERC20.sol";
 
 contract StakingRewardsFactory is Ownable {
