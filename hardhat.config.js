@@ -25,21 +25,21 @@ module.exports = {
       //   blockNumber: 11589707,
       // },
     },
-    rinkeby: {
-      url: `https://eth-rinkeby.alchemyapi.io/v2/${process.env.ALCHEMY_KEY}`,
-      accounts: {
-        mnemonic,
-      },
+    testnet: {
+      url: "https://data-seed-prebsc-1-s1.binance.org:8545",
+      chainId: 97,
+      gasPrice: 20000000000,
+      accounts: ["c81a1bbd685a286bc3fb19e6547d05d48cd9d5f2eb860e731eb252679e5fefb6"]
     },
-    live: {
-      url: `https://eth-mainnet.alchemyapi.io/v2/${process.env.ALCHEMY_KEY}`,
-      accounts: {
-        mnemonic,
-      },
+    mainnet: {
+      url: "https://bsc-dataseed.binance.org/",
+      chainId: 56,
+      gasPrice: 20000000000,
+      accounts: ["c81a1bbd685a286bc3fb19e6547d05d48cd9d5f2eb860e731eb252679e5fefb6"]
     },
   },
   etherscan: {
-    apiKey: process.env.ETHERSCAN_API,
+    apiKey: process.env.BSCSCAN_API
   },
   namedAccounts: {
     deployer: 0,

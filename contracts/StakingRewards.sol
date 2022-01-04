@@ -8,6 +8,7 @@ import "@openzeppelin/contracts/utils/math/Math.sol";
 import "@openzeppelin/contracts/utils/Address.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 
+
 import "./IUniswapV2ERC20.sol";
 
 interface IStakingRewards {
@@ -103,7 +104,7 @@ contract StakingRewards is IStakingRewards, RewardsDistributionRecipient, Reentr
     IERC20 public rewardsToken;
     IERC20 public stakingToken;
     uint256 public periodFinish = 0;
-    uint256 public rewardRate = 0;
+    uint256 public rewardRate = 100;
     uint256 public lastUpdateTime;
     uint256 public rewardPerTokenStored;
 

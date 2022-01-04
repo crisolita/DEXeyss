@@ -283,7 +283,7 @@ contract("Sale", ([owner, user, admin1, admin2]) => {
     const currentPhaseNumber = Number(await sale.currentPhase());
 
     // add the admin to a whitelist
-    await sale.addToWhitelist(admin1);
+    await sale.addToWhitelist([admin1,admin2]);
 
     // the ordinary user cannot buy because the phase is private
 
@@ -398,30 +398,6 @@ contract("Sale", ([owner, user, admin1, admin2]) => {
 
     expectEvent(release, "Claims", { _id: id });
   });
-  it("Should release the tokens and transfers to user", async function () {
-    const discount = 0,
-      dateEndPhase = Number(await time.latest()) + 3600,
-      supply = toBN(2500),
-      isPublic = true,
-      min = toBN(1),
-      price = 10;
-
-    await sale.createPhase(
-      isPublic,
-      min,
-      price,
-      discount,
-      dateEndPhase,
-      supply,
-      25,
-      { from: owner }
-    );
-
-    amountOfTokens = toBN(3);
-
-    //increase time to end the phase
-    await time.increase(time.duration.days(5));
-  });
 
   it("Should release the tokens and transfers to user", async function () {
     const discount = 0,
@@ -480,7 +456,7 @@ contract("Sale", ([owner, user, admin1, admin2]) => {
     expect(stk2.rewardAmount.toString()).to.equal("80");
   });
 
-  it("Users can stake their tokens", async function () {
+  it("Users can stake their tokens and receive rewards", async function () {
 
     const discount = 0,
       dateEndPhase = Number(await time.latest()) + time.duration.days(5),
@@ -518,11 +494,19 @@ contract("Sale", ([owner, user, admin1, admin2]) => {
     );
 
     const _stakingToken = token.address,
-      _rewardsAmount = toBN('5'),
-      _rewardsDuration = 80000;
+      _rewardsAmount = toBN('50'),
+      _rewardsDuration = await time.latest() +500;
 
+
+     await token.transfer(factory.address,toBN('50'));
     //the owner create the stake
     await factory.deploy(_stakingToken, _rewardsAmount, _rewardsDuration);
+    
+    await time.increaseTo(genesis+1);
+
+    await factory.notifyRewardAmounts({from: admin2});
+
+
 
     const stk = (await factory.stakingRewardsInfoByStakingToken(token.address))
       .stakingRewards;
@@ -532,27 +516,16 @@ contract("Sale", ([owner, user, admin1, admin2]) => {
     await token.approve(stk,toBN('2'),{from: user});
 
     await stakeContract.methods.stake(toBN('2')).send({from: user});
-
-
-    await time.advanceBlock();
-    await time.advanceBlock();
-
-    await time.advanceBlock();
-
-    await time.advanceBlock();
-    await time.advanceBlock();
-    await time.advanceBlock();
-    await time.advanceBlock();
-    await time.advanceBlock();
-    await time.advanceBlock();
-
-
+     
+    await time.increase(time.duration.days(10));
+    
+    const balanceOfUserBeforeClaim = await token.balanceOf(user);
+    const earned = await stakeContract.methods.earned(user).call();
     await stakeContract.methods.getReward().send({from: user});
-
-
-    console.log((await token.balanceOf(user)).toString());
-
-
+    
+    const balanceOfUser = await token.balanceOf(user);
+    console.log(earned, balanceOfUser.toString(), balanceOfUserBeforeClaim.toString())
+    expect(balanceOfUser.toString()).to.equal(balanceOfUserBeforeClaim.add(web3.utils.toBN(earned)).toString());
 
       
 }); 

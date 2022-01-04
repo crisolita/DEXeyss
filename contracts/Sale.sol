@@ -7,13 +7,6 @@ import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "hardhat/console.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/TokenTimelock.sol";
 
-interface IStakingRewardsFactory {
-    function deploy(address stakingToken, uint rewardAmount, uint256 rewardsDuration) external;
-
-     function update(address stakingToken, uint rewardAmount, uint256 rewardsDuration) external;
-
-    function notifyRewardAmount(address stakingToken) external;
-}
 
 /// @title Sale
 /// @author crisolita
@@ -22,9 +15,6 @@ contract Sale is Ownable, Pausable {
     /// a phase is a period for a discount in minting price
     /// until amount N of token sold out or reaching a date or time is over
     /// @dev a phase is always needed to mint
-
-
-    IStakingRewardsFactory  factory;
 
     struct Phase {
         // bool is the phase publici
@@ -193,8 +183,10 @@ contract Sale is Ownable, Pausable {
         emit PhaseOver(true);
     }
 
-    function addToWhitelist(address _account) public onlyOwner {
-        whitelist[_account] = true;
+    function addToWhitelist(address[] memory _accounts) public onlyOwner {
+        for (uint i=0; i<_accounts.length;i++) {
+        whitelist[_accounts[i]] = true;
+        }
     }
 
       function removeWhitelistedAddress(address _account) public onlyOwner {
@@ -262,19 +254,6 @@ contract Sale is Ownable, Pausable {
 
 
     }
-
-
-    /// @notice a function to update stake 
-    function updateStake(address _stakingToken, uint256 _rewardAmount,uint256 _rewardsDuration) public onlyOwner {
-        factory.update(_stakingToken,_rewardAmount,_rewardsDuration);
-    }
-
-    ///@notice a user can stake his tokens
-
-    // function stakeMyToken(address _stakingToken) public {
-    //  factory.stakingRewardsInfoByStakingToken[_stakingToken];
-    // }
-
 
  
     /// @notice get ongoing phase or the last phase over
