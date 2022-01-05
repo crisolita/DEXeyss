@@ -12,7 +12,7 @@ async function main() {
 
   await token.deployed();
 
-  const maxSupply = 100000000000000;
+  const maxSupply = "1000000000000000000000";
   console.log("Token deployed to:", token.address)
 
   const Sale = await hre.ethers.getContractFactory("Sale"); // Getting the Contract

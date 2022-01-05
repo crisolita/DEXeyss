@@ -27,8 +27,6 @@ contract Sale is Ownable, Pausable {
         uint256 discount;
         // timestamp when this phase ends
         uint256 endAt;
-        // initial supply
-        uint256 initSupply;
         // uint that decreases when sold in phase
         // @note to know the original supply look up in logs
         uint256 supply;
@@ -61,10 +59,11 @@ contract Sale is Ownable, Pausable {
     /// @dev phases[totalPhase - 1] to get the total phase
     uint256 public totalPhase;
 
-    /// @notice max amount of token allowed to mint in this contract
+    /// @notice max amount of token allowed to sell in this contract
     uint256 public immutable maxSupply;
 
-    /// @notice current mintable amount of tokens
+    
+    /// @notice current amount of tokens 
     uint256 public supply;
 
     /// @notice wallet to transfer funds of the contract
@@ -99,7 +98,6 @@ contract Sale is Ownable, Pausable {
         address _tokenAddress
     ) {
         currentPhase = 0;
-        totalPhase = 0;
         maxSupply = _maxSupply;
         supply = _maxSupply;
         dispatcher = _dispatcher;
@@ -125,6 +123,26 @@ contract Sale is Ownable, Pausable {
         uint256 _supply,
         uint256 _timeLock
     ) external onlyOwner {
+        require(_discount < 1001, "Discount cannot be greater than 100%");
+        require(
+            block.timestamp < _endAt,
+            "The end of the phase should be greater than now"
+        );
+        require(supply >= _supply, "Not enough supply to mint");
+        require(
+            ERC20(tokenAddress).transferFrom(
+                dispatcher,
+                address(this),
+                _supply
+            ),
+            "The token could not be transferred to the phase"
+        );
+
+        currentPhase++;
+        Phase memory p = Phase(_isPublic,_minimunEntry,_price,_discount,_endAt,_supply,false,_timeLock);
+        phases[currentPhase] = p;
+    
+
         emit PhaseCreated(
             totalPhase,
             _isPublic,
@@ -133,44 +151,6 @@ contract Sale is Ownable, Pausable {
             _discount,
             _endAt,
             _supply
-        );
-
-        Phase storage p = phases[totalPhase++];
-
-        p.isPublic = _isPublic;
-
-        p.minimunEntry = _minimunEntry;
-
-        p.price = _price;
-
-        require(_discount < 1001, "Discount cannot be greater than 100%");
-        p.discount = _discount;
-
-        require(
-            block.timestamp < _endAt,
-            "The end of the phase should be greater than now"
-        );
-        p.endAt = _endAt;
-
-        p.initSupply = _supply;
-
-        p.over = false;
-
-        p.time = _timeLock;
-
-        require(supply >= _supply, "Not enough supply to mint");
-        /// supply will decrease with each phase
-        /// if the supply reaches 0 means that the cap of token are distributed in the phases
-        supply -= _supply;
-        p.supply = _supply;
-
-        require(
-            ERC20(tokenAddress).transferFrom(
-                dispatcher,
-                address(this),
-                _supply
-            ),
-            "The token could not be transferred to the phase"
         );
     }
 
@@ -211,6 +191,7 @@ contract Sale is Ownable, Pausable {
             emit PhaseOver(true);
         }
 
+                
           require(
             phases[currentPhase].over == false,
             "This phase is over, wait for the next"
@@ -218,7 +199,7 @@ contract Sale is Ownable, Pausable {
 
         require(
             phases[currentPhase].supply >= _tokenAmount,
-            "Not enought supply"
+            "Not enough supply"
         );
 
         require(
@@ -238,11 +219,16 @@ contract Sale is Ownable, Pausable {
         } 
        
         require(finalPrice <= msg.value, "Not enough ETH/BNB");
+        if (phases[currentPhase].time >0) {
         TokenTimelock usertime = new TokenTimelock(IERC20(tokenAddress),msg.sender,block.timestamp + phases[currentPhase].time);
-        ERC20(tokenAddress).transfer(address(usertime),_tokenAmount);
+        ERC20(tokenAddress).transferFrom(dispatcher,address(usertime),_tokenAmount);
+           id++;
         tokenLock[id] = usertime;
-        emit Purchase(msg.sender, _tokenAmount, finalPrice,id);
-        id++;
+        } else {
+            ERC20(tokenAddress).transferFrom(dispatcher,msg.sender, _tokenAmount);
+            id++;
+        }
+        
         /// change current phase total supply
         phases[currentPhase].supply -= _tokenAmount;
         /// advance phase if the supply is out
@@ -251,19 +237,15 @@ contract Sale is Ownable, Pausable {
             emit PhaseOver(true);
         }
 
+        supply-=_tokenAmount;
 
-
+        emit Purchase(msg.sender, _tokenAmount, finalPrice,id);
     }
 
  
     /// @notice get ongoing phase or the last phase over
     function getcurrentPhase() external view returns (Phase memory) {
         return phases[currentPhase];
-    }
-
-    /// @notice pause the mint, no one could buy token from this contract
-    function pauseMint() external onlyOwner {
-        _pause();
     }
 
     //release the tokens at time
@@ -279,8 +261,5 @@ contract Sale is Ownable, Pausable {
         payable(_account).transfer(_amount);
     }
 
-    /// @notice continue minting, let user call function to buy token
-    function unpauseMint() external onlyOwner {
-        _unpause();
-    }
+   
 }
