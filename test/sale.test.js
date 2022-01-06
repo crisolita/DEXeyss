@@ -39,8 +39,7 @@ contract("Sale", ([owner, user, admin1, admin2]) => {
     await token.approve(sale.address, maxSupply, { from: owner });
   });
   it("Create first phase", async function () {
-    const discount = 505 /** 50.5% */,
-      price = '5' /** 1 ETH/BNB = 5 Tokens */,
+    const price = '5' /** 1 ETH/BNB = 5 Tokens */,
       min = toBN(2);
     (supply = toBN(5000)),
       (dateEndPhase =
@@ -50,7 +49,6 @@ contract("Sale", ([owner, user, admin1, admin2]) => {
       true,
       min,
       price,
-      discount,
       dateEndPhase,
       supply,
       25,
@@ -62,7 +60,6 @@ contract("Sale", ([owner, user, admin1, admin2]) => {
     const phase = await sale.phases(1);
 
     /** checking that the phase is created */
-    expect(Number(phase.discount)).to.equal(Number(discount));
     expect(phase.price.toString()).to.equal(price.toString(), "Phase price err");
     expect(Number(phase.minimunEntry)).to.equal(
       Number(min),
@@ -75,8 +72,7 @@ contract("Sale", ([owner, user, admin1, admin2]) => {
     expect(Number(phase.supply)).to.equal(Number(supply), "Phase supply err");
   });
   it("Create first phase, buy tokens, cancel phase (by owner) and created another phase to buy", async function () {
-    const discount = 505 /** 50.5% */,
-      price = toBN(5)/** 1 ETH/BNB = 5 Tokens */,
+    const price = toBN(5)/** 1 ETH/BNB = 5 Tokens */,
       min = toBN(2); 
     (supply = toBN(500)),
       (dateEndPhase =
@@ -86,7 +82,6 @@ contract("Sale", ([owner, user, admin1, admin2]) => {
       true,
       min,
       price,
-      discount,
       dateEndPhase,
       supply,
       25,
@@ -95,16 +90,27 @@ contract("Sale", ([owner, user, admin1, admin2]) => {
       }
     );
 
+
+      await expectRevert(sale.createPhase(
+        true,
+        min,
+        price,
+        dateEndPhase,
+        supply,
+        25,
+        {
+          from: owner,
+        }
+      ),"This phase isn't over")
     expect((await token.balanceOf(user)).toString()).to.equal('0');
     await sale.buyToken(toBN(25),{from: user,value: toBN(1) });
 
-    await sale.cancelPhase();
+   await sale.cancelPhase();
 
     await sale.createPhase(
       true,
       min,
       price,
-      0,
       dateEndPhase,
       supply,
       0,
@@ -130,28 +136,14 @@ contract("Sale", ([owner, user, admin1, admin2]) => {
   });
 
   it("Errors creating phases", async function () {
-    /// err 200% discount
-    await expectRevert(
-      sale.createPhase(
-        true,
-        toBN(2),
-        5,
-        2000,
-        (await time.latest()) + 1,
-        toBN(1),
-        25,
-        {
-          from: owner,
-        }
-      ),
-      "Discount cannot be greater than 100%"
-    );
+
+    const maxSupply = toBN(1000);
+   
     /// err end date is now less one second
     await expectRevert(
       sale.createPhase(
         true,
         toBN(2),
-        200,
         1,
         (await time.latest()) - 1,
         toBN(1),
@@ -163,12 +155,10 @@ contract("Sale", ([owner, user, admin1, admin2]) => {
       "The end of the phase should be greater than now"
     );
     /// err more that maxSupply (the current supply is maxSupply - phase one original supply)
-    const maxSupply = toBN(10000);
     await expectRevert(
       sale.createPhase(
         true,
         toBN(1),
-        200,
         1,
         (await time.latest()) + 1,
         maxSupply + 20,
@@ -177,14 +167,11 @@ contract("Sale", ([owner, user, admin1, admin2]) => {
           from: owner,
         }
       ),
-      "Not enough supply to mint"
-    );
+      "Not enough supply to mint");
   });
 
   it("Should release token in the rigth time", async function () {
-    const discount = 505 /** 50.5% */,
-      maxSupply = toBN(10000),
-      price = 5 /** 1 ETH/BNB = 5 Tokens */,
+    const price = 5 /** 1 ETH/BNB = 5 Tokens */,
       min = toBN(2);
     (supply = toBN(5000)),
       (dateEndPhase =
@@ -196,7 +183,6 @@ contract("Sale", ([owner, user, admin1, admin2]) => {
       true,
       min,
       price,
-      discount,
       dateEndPhase,
       supply,
       timeLock,
@@ -249,8 +235,7 @@ contract("Sale", ([owner, user, admin1, admin2]) => {
   });
 
   it("Should end the phase (supply out)", async function () {
-    const discount = 505,
-      dateEndPhase = Number(await time.latest()) + time.duration.days(1),
+    const dateEndPhase = Number(await time.latest()) + time.duration.days(1),
       supply = toBN(2500),
       isPublic = true,
       min = toBN(2),
@@ -260,7 +245,6 @@ contract("Sale", ([owner, user, admin1, admin2]) => {
       isPublic,
       min,
       price,
-      discount,
       dateEndPhase,
       supply,
       25,
@@ -273,11 +257,7 @@ contract("Sale", ([owner, user, admin1, admin2]) => {
 
     // call the ETH/BNB needed to this operation
     const ethNeeded =
-    Math.ceil(Number((await sale.phases(currentPhaseNumber)).supply) /
-    (Number((await sale.phases(currentPhaseNumber)).price) *
-      (1000 -
-        Number((await sale.phases(currentPhaseNumber)).discount))) /
-    1000);
+    Math.ceil(Number((await sale.phases(currentPhaseNumber)).supply)/Number((await sale.phases(currentPhaseNumber)).price));
     // / err not enought ETH/BNB
     await expectRevert(
       sale.buyToken((await sale.phases(currentPhaseNumber)).supply, {
@@ -311,15 +291,13 @@ contract("Sale", ([owner, user, admin1, admin2]) => {
   });
 
   it("Only the two admins can access to the private phase", async function () {
-    const discount = 0,
-      dateEndPhase = Number(await time.latest()) + time.duration.days(10),
+    const dateEndPhase = Number(await time.latest()) + time.duration.days(10),
       supply = await sale.supply();
 
     await sale.createPhase(
       false,
       toBN(2),
       5,
-      discount,
       dateEndPhase,
       supply,
       25,
@@ -342,15 +320,13 @@ contract("Sale", ([owner, user, admin1, admin2]) => {
   });
 
   it("Only owner can cancel the phase", async function () {
-    const discount = 0,
-      dateEndPhase = Number(await time.latest()) + time.duration.days(1),
+    const dateEndPhase = Number(await time.latest()) + time.duration.days(1),
       supply = await sale.supply();
 
     await sale.createPhase(
       true,
       toBN(2),
       5,
-      discount,
       dateEndPhase,
       supply,
       25,
@@ -374,8 +350,7 @@ contract("Sale", ([owner, user, admin1, admin2]) => {
   });
 
   it("Should end the phase (time out)", async function () {
-    const discount = 0,
-      dateEndPhase = Number(await time.latest()) + 3600,
+    const dateEndPhase = Number(await time.latest()) + 3600,
       supply = toBN(2500),
       isPublic = true,
       min = toBN(1),
@@ -385,7 +360,6 @@ contract("Sale", ([owner, user, admin1, admin2]) => {
       isPublic,
       min,
       price,
-      discount,
       dateEndPhase,
       supply,
       25,
@@ -404,8 +378,7 @@ contract("Sale", ([owner, user, admin1, admin2]) => {
   });
 
   it("Should recieve the purchase event and release event", async function () {
-    const maxSupply = toBN(10000),
-      price = 278934 /** 1 ETH/BNB = 5 Tokens */,
+    const  price = 278934 /** 1 ETH/BNB = 5 Tokens */,
       min = toBN("9");
     (supply = toBN(5000)),
       (dateEndPhase =
@@ -417,7 +390,6 @@ contract("Sale", ([owner, user, admin1, admin2]) => {
       true,
       min,
       price,
-      0,
       dateEndPhase,
       supply,
       timeLock,
@@ -447,8 +419,7 @@ contract("Sale", ([owner, user, admin1, admin2]) => {
   });
 
   it("Should release the tokens and transfers to user", async function () {
-    const discount = 0,
-      dateEndPhase = Number(await time.latest()) + time.duration.days(5),
+    const dateEndPhase = Number(await time.latest()) + time.duration.days(5),
       supply = toBN(2500),
       isPublic = true,
       min = toBN(1),
@@ -458,7 +429,6 @@ contract("Sale", ([owner, user, admin1, admin2]) => {
       isPublic,
       min,
       price,
-      discount,
       dateEndPhase,
       supply,
       6800,
@@ -505,8 +475,7 @@ contract("Sale", ([owner, user, admin1, admin2]) => {
 
   it("Users can stake their tokens and receive rewards", async function () {
 
-    const discount = 0,
-      dateEndPhase = Number(await time.latest()) + time.duration.days(5),
+    const dateEndPhase = Number(await time.latest()) + time.duration.days(5),
       supply = toBN(2500),
       isPublic = true,
       min = toBN(1),
@@ -516,7 +485,6 @@ contract("Sale", ([owner, user, admin1, admin2]) => {
       isPublic,
       min,
       price,
-      discount,
       dateEndPhase,
       supply,
       6800,

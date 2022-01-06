@@ -12,7 +12,6 @@ import "@openzeppelin/contracts/token/ERC20/utils/TokenTimelock.sol";
 /// @author crisolita
 /// @notice this contract allow create phases for mint token and transfer the funds
 contract Sale is Ownable, Pausable {
-    /// a phase is a period for a discount in minting price
     /// until amount N of token sold out or reaching a date or time is over
     /// @dev a phase is always needed to mint
 
@@ -23,8 +22,6 @@ contract Sale is Ownable, Pausable {
         uint256 minimunEntry;
         // uint amount of tokens minted for one BNB/ETH
         uint256 price;
-        // uint between 0(0.0%) - 1000(100.0%) to mul with the price on sell
-        uint256 discount;
         // timestamp when this phase ends
         uint256 endAt;
         // uint that decreases when sold in phase
@@ -84,7 +81,6 @@ contract Sale is Ownable, Pausable {
         bool isPublic,
         uint256 _minimunEntry,
         uint256 _price,
-        uint256 _discount,
         uint256 _endAt,
         uint256 _supply
     );
@@ -102,6 +98,7 @@ contract Sale is Ownable, Pausable {
         supply = _maxSupply;
         dispatcher = _dispatcher;
         tokenAddress = _tokenAddress;
+        phases[currentPhase].over = true;
     }
 
     //receive a bool and make the access possible
@@ -118,12 +115,11 @@ contract Sale is Ownable, Pausable {
         bool _isPublic,
         uint256 _minimunEntry,
         uint256 _price,
-        uint256 _discount,
         uint256 _endAt,
         uint256 _supply,
         uint256 _timeLock
     ) external onlyOwner {
-        require(_discount < 1001, "Discount cannot be greater than 100%");
+        require(phases[currentPhase].over,"This phase isn't over");
         require(
             block.timestamp < _endAt,
             "The end of the phase should be greater than now"
@@ -139,7 +135,7 @@ contract Sale is Ownable, Pausable {
         );
 
         currentPhase++;
-        Phase memory p = Phase(_isPublic,_minimunEntry,_price,_discount,_endAt,_supply,false,_timeLock);
+        Phase memory p = Phase(_isPublic,_minimunEntry,_price,_endAt,_supply,false,_timeLock);
         phases[currentPhase] = p;
     
 
@@ -148,7 +144,6 @@ contract Sale is Ownable, Pausable {
             _isPublic,
             _minimunEntry,
             _price,
-            _discount,
             _endAt,
             _supply
         );
@@ -210,15 +205,8 @@ contract Sale is Ownable, Pausable {
         // calculation: tokens / (price * (100 - discount) / 100)
     
         uint256 finalPrice = _tokenAmount/phases[currentPhase].price;
-
-
-        if (phases[currentPhase].discount!= 0 ) {
-             finalPrice = (_tokenAmount)/(phases[currentPhase].price*(1000-phases[currentPhase].discount))/1000;
-        } 
-
-        console.log(finalPrice);
        
-        require(finalPrice < msg.value, "Not enough ETH/BNB");
+        require(finalPrice <= msg.value, "Not enough ETH/BNB");
 
         if (phases[currentPhase].time >0) {
         TokenTimelock usertime = new TokenTimelock(IERC20(tokenAddress),msg.sender,block.timestamp + phases[currentPhase].time);
@@ -250,6 +238,8 @@ contract Sale is Ownable, Pausable {
     function getcurrentPhase() external view returns (Phase memory) {
         return phases[currentPhase];
     }
+
+    /// @notice get contract balance
 
     //release the tokens at time
 
