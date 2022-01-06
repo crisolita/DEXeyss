@@ -535,13 +535,19 @@ contract("Sale", ([owner, user, admin1, admin2]) => {
     await time.increase(time.duration.days(10));
     
     const balanceOfUserBeforeClaim = await token.balanceOf(user);
-    const earned = await stakeContract.methods.earned(user).call();
-    await stakeContract.methods.getReward().send({from: user});
+
+    const tx = await stakeContract.methods.getReward().send({from: user});
+
+    const earned = web3.utils.toBN(parseInt(tx.events[0].raw.data,16));
     
     const balanceOfUser = await token.balanceOf(user);
+    
+    
+    console.log(balanceOfUserBeforeClaim.toString(), earned, balanceOfUser.toString())
 
-    //expect(balanceOfUser.toString()).to.equal(balanceOfUserBeforeClaim.add(web3.utils.toBN(earned)).toString());
+    expect(balanceOfUser.toString()).to.equal(balanceOfUserBeforeClaim.add(earned).toString());
 
       
 }); 
+
 });

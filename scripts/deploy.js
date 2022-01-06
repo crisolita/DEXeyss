@@ -20,7 +20,18 @@ async function main() {
 
   await sale.deployed(); // waiting for the contract to be deployed
 
+ const  genesis = new Date();
+ genesis.setMinutes(genesis.getMinutes() + 5);
+
+  const StakingRewardsFactory= await hre.ethers.getContractFactory("StakingRewardsFactory"); // Getting the Contract
+  const stakingRewardsFactory = await StakingRewardsFactory.deploy("0xaB97b0eEA567Bf8c5eEC65DE489F8faeF13646Af",genesis.getTime()); //deploying the contract
+
+  await stakingRewardsFactory.deployed(); // waiting for the contract to be deployed
+
+
   console.log("Sale deployed to:", sale.address); // Returning the contract address on the rinkeby
+  console.log("StakingRewardsFactory deployed to:", stakingRewardsFactory.address); // Returning the contract address on the rinkeby
+
 }
 
 main()
