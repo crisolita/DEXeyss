@@ -40,7 +40,7 @@ contract("Sale", ([owner, user, admin1, admin2]) => {
   });
   it("Create first phase", async function () {
     const discount = 505 /** 50.5% */,
-      price = 5 /** 1 ETH/BNB = 5 Tokens */,
+      price = '5' /** 1 ETH/BNB = 5 Tokens */,
       min = toBN(2);
     (supply = toBN(5000)),
       (dateEndPhase =
@@ -63,7 +63,7 @@ contract("Sale", ([owner, user, admin1, admin2]) => {
 
     /** checking that the phase is created */
     expect(Number(phase.discount)).to.equal(Number(discount));
-    expect(Number(phase.price)).to.equal(price, "Phase price err");
+    expect(phase.price.toString()).to.equal(price.toString(), "Phase price err");
     expect(Number(phase.minimunEntry)).to.equal(
       Number(min),
       "Phase minimunEntry err"
@@ -77,7 +77,7 @@ contract("Sale", ([owner, user, admin1, admin2]) => {
   it("Create first phase, buy tokens, cancel phase (by owner) and created another phase to buy", async function () {
     const discount = 505 /** 50.5% */,
       price = toBN(5)/** 1 ETH/BNB = 5 Tokens */,
-      min = toBN(2);
+      min = toBN(2); 
     (supply = toBN(500)),
       (dateEndPhase =
         Number(await time.latest()) + 3600) /** the phase will last one hour */;
@@ -151,7 +151,7 @@ contract("Sale", ([owner, user, admin1, admin2]) => {
       sale.createPhase(
         true,
         toBN(2),
-        2000,
+        200,
         1,
         (await time.latest()) - 1,
         toBN(1),
@@ -216,7 +216,7 @@ contract("Sale", ([owner, user, admin1, admin2]) => {
 
     await sale.buyToken(toBN("400"), {
       from: user,
-      value: toWei("160.5"),
+      value: toWei('162'),
     });
 
     await expectRevert(
@@ -254,7 +254,7 @@ contract("Sale", ([owner, user, admin1, admin2]) => {
       supply = toBN(2500),
       isPublic = true,
       min = toBN(2),
-      price = 10;
+      price = toBN(5);
 
     await sale.createPhase(
       isPublic,
@@ -272,17 +272,17 @@ contract("Sale", ([owner, user, admin1, admin2]) => {
     amountOfTokens = toBN(3);
 
     // call the ETH/BNB needed to this operation
-    const ethNeeded = Math.ceil(
-      Number((await sale.phases(currentPhaseNumber)).supply) /
-        (Number((await sale.phases(currentPhaseNumber)).price) *
-          (1000 - Number((await sale.phases(currentPhaseNumber)).discount))) /
-        1000
-    );
+    const ethNeeded =
+    Math.ceil(Number((await sale.phases(currentPhaseNumber)).supply) /
+    (Number((await sale.phases(currentPhaseNumber)).price) *
+      (1000 -
+        Number((await sale.phases(currentPhaseNumber)).discount))) /
+    1000);
     // / err not enought ETH/BNB
     await expectRevert(
       sale.buyToken((await sale.phases(currentPhaseNumber)).supply, {
         from: user,
-        value: ethNeeded - 1000,
+        value: ethNeeded-1,
       }),
       "Not enough ETH/BNB"
     );
@@ -436,7 +436,6 @@ contract("Sale", ([owner, user, admin1, admin2]) => {
     expectEvent(shop, "Purchase", {
       _account: user,
       _amount: toBN("10"),
-      _price: "price",
       _id: id,
     });
 
@@ -572,7 +571,7 @@ contract("Sale", ([owner, user, admin1, admin2]) => {
     await stakeContract.methods.getReward().send({from: user});
     
     const balanceOfUser = await token.balanceOf(user);
-    console.log(earned, balanceOfUser.toString(), balanceOfUserBeforeClaim.toString())
+
     //expect(balanceOfUser.toString()).to.equal(balanceOfUserBeforeClaim.add(web3.utils.toBN(earned)).toString());
 
       

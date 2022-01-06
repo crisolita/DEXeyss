@@ -76,7 +76,7 @@ contract Sale is Ownable, Pausable {
     event DispatcherChange(address indexed _dispatcher);
 
     /// records the token transfers made by the contract
-    event Purchase(address indexed _account, uint256 _amount, uint256 _price,uint256 _id);
+    event Purchase(address indexed _account, uint256 _amount,uint256 _id);
 
     /// records creation  of phases
     event PhaseCreated(
@@ -209,21 +209,24 @@ contract Sale is Ownable, Pausable {
 
         // calculation: tokens / (price * (100 - discount) / 100)
     
-        uint256 finalPrice = phases[currentPhase].price;
+        uint256 finalPrice = _tokenAmount/phases[currentPhase].price;
 
 
         if (phases[currentPhase].discount!= 0 ) {
-             finalPrice = (_tokenAmount /
-            (phases[currentPhase].price *
-                (1000 - phases[currentPhase].discount))) / 1000;
+             finalPrice = (_tokenAmount)/(phases[currentPhase].price*(1000-phases[currentPhase].discount))/1000;
         } 
+
+        console.log(finalPrice);
        
-        require(finalPrice <= msg.value, "Not enough ETH/BNB");
+        require(finalPrice < msg.value, "Not enough ETH/BNB");
+
         if (phases[currentPhase].time >0) {
         TokenTimelock usertime = new TokenTimelock(IERC20(tokenAddress),msg.sender,block.timestamp + phases[currentPhase].time);
         ERC20(tokenAddress).transferFrom(dispatcher,address(usertime),_tokenAmount);
+
            id++;
         tokenLock[id] = usertime;
+
         } else {
             ERC20(tokenAddress).transferFrom(dispatcher,msg.sender, _tokenAmount);
             id++;
@@ -239,7 +242,7 @@ contract Sale is Ownable, Pausable {
 
         supply-=_tokenAmount;
 
-        emit Purchase(msg.sender, _tokenAmount, finalPrice,id);
+        emit Purchase(msg.sender, _tokenAmount,id);
     }
 
  
@@ -260,6 +263,8 @@ contract Sale is Ownable, Pausable {
     function withdraw(address _account, uint256 _amount) external onlyOwner {
         payable(_account).transfer(_amount);
     }
+
+    receive() external payable{}
 
    
 }

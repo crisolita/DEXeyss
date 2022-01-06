@@ -7,16 +7,16 @@ async function main() {
 
   console.log("Deploying contracts with the account:", deployer.address); 
 
-  const Token = await hre.ethers.getContractFactory("Token");
-  const token = await Token.deploy();
+  // const Token = await hre.ethers.getContractFactory("Token");
+  // const token = await Token.deploy();
 
-  await token.deployed();
+  // await token.deployed();
 
   const maxSupply = "1000000000000000000000";
-  console.log("Token deployed to:", token.address)
+  console.log("Token deployed to:", "0xaB97b0eEA567Bf8c5eEC65DE489F8faeF13646Af");
 
   const Sale = await hre.ethers.getContractFactory("Sale"); // Getting the Contract
-  const sale = await Sale.deploy(maxSupply,deployer.address,token.address); //deploying the contract
+  const sale = await Sale.deploy(maxSupply,deployer.address,"0xaB97b0eEA567Bf8c5eEC65DE489F8faeF13646Af"); //deploying the contract
 
   await sale.deployed(); // waiting for the contract to be deployed
 
