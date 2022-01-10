@@ -8,6 +8,7 @@ import "hardhat/console.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/TokenTimelock.sol";
 
 
+
 /// @title Sale
 /// @author crisolita
 /// @notice this contract allow create phases for mint token and transfer the funds
@@ -119,6 +120,9 @@ contract Sale is Ownable, Pausable {
         uint256 _supply,
         uint256 _timeLock
     ) external onlyOwner {
+         if (block.timestamp > phases[currentPhase].endAt) {
+            phases[currentPhase].over = true;
+            }
         require(phases[currentPhase].over,"This phase isn't over");
         require(
             block.timestamp < _endAt,
@@ -181,14 +185,8 @@ contract Sale is Ownable, Pausable {
         whenNotPaused
         isPublic
     {
-        if (block.timestamp > phases[currentPhase].endAt) {
-            phases[currentPhase].over = true;
-            emit PhaseOver(true);
-        }
-
-                
           require(
-            phases[currentPhase].over == false,
+           block.timestamp < phases[currentPhase].endAt,
             "This phase is over, wait for the next"
         );
 

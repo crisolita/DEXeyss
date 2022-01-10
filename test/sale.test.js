@@ -5,6 +5,11 @@ const StakingRewardsFactory = artifacts.require("StakingRewardsFactory");
 const Token = artifacts.require("Token");
 const { Provider } = require("@ethersproject/abstract-provider");
 
+/**Token deployed to: 0xaB97b0eEA567Bf8c5eEC65DE489F8faeF13646Af
+1641526899355
+Sale deployed to: 0xa3910E54B609881AE689d6faf5497472ca043C1A
+StakingRewardsFactory deployed to: 0xBD66934E02BbEa25F1f8cFC69A7369084ca3d926
+stakigRewards= 0xa390570e9bb65d972269c433fC2aFCeCA2be9031*/
 
 const {
   expectEvent,
@@ -542,11 +547,12 @@ contract("Sale", ([owner, user, admin1, admin2]) => {
     
     const balanceOfUser = await token.balanceOf(user);
     
-    
-    console.log(balanceOfUserBeforeClaim.toString(), earned, balanceOfUser.toString())
 
     expect(balanceOfUser.toString()).to.equal(balanceOfUserBeforeClaim.add(earned).toString());
 
+    console.log((web3.utils.toBN(await time.latest()).add(web3.utils.toBN(time.duration.minutes(5)))).toString());
+  
+    console.log((web3.utils.toBN(1641662917212).div(web3.utils.toBN(1000))).toString(),"time");
       
 }); 
 
