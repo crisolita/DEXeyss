@@ -35,6 +35,7 @@ contract Sale is Ownable, Pausable {
         uint256 time;
     }
 
+    AggregatorV3Interface private priceFeed;
 
 
     /// all phases (next, current and previous)
@@ -93,8 +94,10 @@ contract Sale is Ownable, Pausable {
     constructor(
         uint256 _maxSupply,
         address _dispatcher,
-        address _tokenAddress
+        address _tokenAddress,
+        address _chainLinkBNB_USD
     ) {
+        priceFeed = AggregatorV3Interface(_chainLinkBNB_USD);
         currentPhase = 0;
         maxSupply = _maxSupply;
         supply = _maxSupply;
@@ -181,10 +184,7 @@ contract Sale is Ownable, Pausable {
  
     ///@dev get the usd/BNB price
       function getLatestPrice() public view returns (uint256) {
-        
-        AggregatorV3Interface priceFeed = AggregatorV3Interface(0x14e613AC84a31f709eadbdF89C6CC390fDc9540A);
-
-        (, int256 price, , , ) = priceFeed.latestRoundData();
+    (, int256 price, , , ) = priceFeed.latestRoundData();
         return uint256(price)*10**10;
     }
 

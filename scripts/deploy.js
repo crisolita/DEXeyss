@@ -7,16 +7,17 @@ async function main() {
 
   console.log("Deploying contracts with the account:", deployer.address); 
 
-  // const Token = await hre.ethers.getContractFactory("Token");
-  // const token = await Token.deploy();
+  const Token = await hre.ethers.getContractFactory("Token");
+  const token = await Token.deploy();
 
-  // await token.deployed();
+  await token.deployed();
 
   const maxSupply = "1000000000000000000000";
-  console.log("Token deployed to:", "0xaB97b0eEA567Bf8c5eEC65DE489F8faeF13646Af");
-
+  console.log("Token deployed to:", "0xaB97b0eEA567Bf8c5CCeEC65DE489F8faeF13646Af");
+  const chainLinkBscTestnet_BNB_USD_price = "0x2514895c72f50D8bd4B4F9b1110F0D6bD2c97526";
+  const chainLinkBscMainnet_BNB_USD_price ="0x0567F2323251f0Aab15c8dFb1967E4e8A7D42aeE";
   const Sale = await hre.ethers.getContractFactory("Sale"); // Getting the Contract
-  const sale = await Sale.deploy(maxSupply,deployer.address,"0xaB97b0eEA567Bf8c5eEC65DE489F8faeF13646Af"); //deploying the contract
+  const sale = await Sale.deploy(maxSupply,deployer.address,"0xaB97b0eEA567Bf8c5eEC65DE489F8faeF13646Af",chainLinkBscTestnet_BNB_USD_price); //deploying the contract
 
   await sale.deployed(); // waiting for the contract to be deployed
 

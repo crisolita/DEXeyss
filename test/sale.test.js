@@ -18,6 +18,7 @@ const {
 } = require("@openzeppelin/test-helpers");
 const { web3 } = require("@openzeppelin/test-helpers/src/setup");
 const { expect } = require("chai");
+const { latest } = require('@openzeppelin/test-helpers/src/time');
 
 const BNB = "0xb8c77482e45f1f44de1745f52c74426c631bdd52";
 
@@ -32,8 +33,9 @@ contract("Sale", ([owner, user, admin1, admin2]) => {
 
   beforeEach(async function () {
     const maxSupply = toBN(10000);
+    const chainLinkAddress = "0x14e613AC84a31f709eadbdF89C6CC390fDc9540A";
     token = await Token.new();
-    sale = await Sale.new(maxSupply, owner, token.address, {
+    sale = await Sale.new(maxSupply, owner, token.address,chainLinkAddress, {
       from: owner,
     });
 
@@ -551,6 +553,18 @@ contract("Sale", ([owner, user, admin1, admin2]) => {
     
 
     expect(balanceOfUser.toString()).to.equal(balanceOfUserBeforeClaim.add(earned).toString());
+
+    const now = await time.latest() + time.duration.minutes(8);
+
+
+    console.log(now);
+
+    console.log((web3.utils.toBN(1641864143674).div(web3.utils.toBN(1000))).toString());
+
+
+
+
+
    
 }); 
 
