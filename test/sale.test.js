@@ -44,7 +44,7 @@ contract("Sale", ([owner, user, admin1, admin2]) => {
     await token.approve(sale.address, maxSupply, { from: owner });
   });
   it("Create first phase", async function () {
-    const price = '5' /** 1 ETH/BNB = 5 Tokens */,
+    const price = '5' /** 5$ per token*/,
       min = toBN(2);
     (supply = toBN(5000)),
       (dateEndPhase =
@@ -77,7 +77,7 @@ contract("Sale", ([owner, user, admin1, admin2]) => {
     expect(Number(phase.supply)).to.equal(Number(supply), "Phase supply err");
   });
   it("Create first phase, buy tokens, cancel phase (by owner) and created another phase to buy", async function () {
-    const price = toBN(5)/** 1 ETH/BNB = 5 Tokens */,
+    const price = toBN(5)/** toBN(5) per TOKEN */,
       min = toBN(2); 
     (supply = toBN(500)),
       (dateEndPhase =
@@ -176,7 +176,7 @@ contract("Sale", ([owner, user, admin1, admin2]) => {
   });
 
   it("Should release token in the rigth time", async function () {
-    const price = 5 /** 1 ETH/BNB = 5 Tokens */,
+    const price = 5 /** 5$ per token */,
       min = toBN(2);
     (supply = toBN(5000)),
       (dateEndPhase =
@@ -262,7 +262,9 @@ contract("Sale", ([owner, user, admin1, admin2]) => {
 
     // call the ETH/BNB needed to this operation
     const ethNeeded =
-    Math.ceil(Number((await sale.phases(currentPhaseNumber)).supply)/Number((await sale.phases(currentPhaseNumber)).price));
+    price.mul(supply).div(await sale.getLatestPrice());    
+    
+
     // / err not enought ETH/BNB
     await expectRevert(
       sale.buyToken((await sale.phases(currentPhaseNumber)).supply, {
@@ -383,7 +385,7 @@ contract("Sale", ([owner, user, admin1, admin2]) => {
   });
 
   it("Should recieve the purchase event and release event", async function () {
-    const  price = 278934 /** 1 ETH/BNB = 5 Tokens */,
+    const  price = 278934 /** 278934$ per token*/,
       min = toBN("9");
     (supply = toBN(5000)),
       (dateEndPhase =
@@ -549,11 +551,7 @@ contract("Sale", ([owner, user, admin1, admin2]) => {
     
 
     expect(balanceOfUser.toString()).to.equal(balanceOfUserBeforeClaim.add(earned).toString());
-
-    console.log((web3.utils.toBN(await time.latest()).add(web3.utils.toBN(time.duration.minutes(5)))).toString());
-  
-    console.log((web3.utils.toBN(1641662917212).div(web3.utils.toBN(1000))).toString(),"time");
-      
+   
 }); 
 
 });

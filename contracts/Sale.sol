@@ -6,6 +6,7 @@ import "@openzeppelin/contracts/security/Pausable.sol";
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "hardhat/console.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/TokenTimelock.sol";
+import "@chainlink/contracts/src/v0.8/interfaces/AggregatorV3Interface.sol";
 
 
 
@@ -21,7 +22,7 @@ contract Sale is Ownable, Pausable {
         bool isPublic;
         // uint minimum amount of token
         uint256 minimunEntry;
-        // uint amount of tokens minted for one BNB/ETH
+        // uint price in usd
         uint256 price;
         // timestamp when this phase ends
         uint256 endAt;
@@ -177,6 +178,15 @@ contract Sale is Ownable, Pausable {
         emit DispatcherChange(_dispatcher);
         dispatcher = _dispatcher;
     }
+ 
+    ///@dev get the usd/BNB price
+      function getLatestPrice() public view returns (uint256) {
+        
+        AggregatorV3Interface priceFeed = AggregatorV3Interface(0x14e613AC84a31f709eadbdF89C6CC390fDc9540A);
+
+        (, int256 price, , , ) = priceFeed.latestRoundData();
+        return uint256(price)*10**10;
+    }
 
     /// @notice mint tokens, require send ETH/BNB
     function buyToken(uint256 _tokenAmount)
@@ -190,6 +200,7 @@ contract Sale is Ownable, Pausable {
             "This phase is over, wait for the next"
         );
 
+
         require(
             phases[currentPhase].supply >= _tokenAmount,
             "Not enough supply"
@@ -200,9 +211,8 @@ contract Sale is Ownable, Pausable {
             "There are too few tokens"
         );
 
-        // calculation: tokens / (price * (100 - discount) / 100)
     
-        uint256 finalPrice = _tokenAmount/phases[currentPhase].price;
+        uint256 finalPrice = _tokenAmount*phases[currentPhase].price/(getLatestPrice());
        
         require(finalPrice <= msg.value, "Not enough ETH/BNB");
 
