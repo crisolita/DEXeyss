@@ -35,10 +35,10 @@ contract("Sale", ([owner, user, admin1, admin2]) => {
     const maxSupply = toBN(10000);
     const chainLinkAddress = "0x14e613AC84a31f709eadbdF89C6CC390fDc9540A";
     token = await Token.new();
-    sale = await Sale.new(maxSupply, owner, token.address,chainLinkAddress, {
+    sale = await Sale.new();
+    sale.initialize(maxSupply, owner, token.address,chainLinkAddress,{
       from: owner,
-    });
-
+    })
     genesis = await time.latest()+1;
     factory = await StakingRewardsFactory.new(token.address,genesis);
 
@@ -555,15 +555,6 @@ contract("Sale", ([owner, user, admin1, admin2]) => {
     expect(balanceOfUser.toString()).to.equal(balanceOfUserBeforeClaim.add(earned).toString());
 
     const now = await time.latest() + time.duration.minutes(8);
-
-
-    console.log(now);
-
-    console.log((web3.utils.toBN(1641864143674).div(web3.utils.toBN(1000))).toString());
-
-
-
-
 
    
 }); 

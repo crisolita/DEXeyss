@@ -7,13 +7,14 @@ import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "hardhat/console.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/TokenTimelock.sol";
 import "@chainlink/contracts/src/v0.8/interfaces/AggregatorV3Interface.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 
 
 
 /// @title Sale
 /// @author crisolita
 /// @notice this contract allow create phases for mint token and transfer the funds
-contract Sale is Ownable, Pausable {
+contract Sale is Ownable, Pausable, Initializable  {
     /// until amount N of token sold out or reaching a date or time is over
     /// @dev a phase is always needed to mint
 
@@ -56,11 +57,9 @@ contract Sale is Ownable, Pausable {
 
     uint256 public id;
     /// reference for the mapping of phases, uint of the total phase
-    /// @dev phases[totalPhase - 1] to get the total phase
-    uint256 public totalPhase;
 
     /// @notice max amount of token allowed to sell in this contract
-    uint256 public immutable maxSupply;
+    uint256 public maxSupply;
 
     
     /// @notice current amount of tokens 
@@ -78,9 +77,11 @@ contract Sale is Ownable, Pausable {
     /// records the token transfers made by the contract
     event Purchase(address indexed _account, uint256 _amount,uint256 _id);
 
+    //event to control withdraw
+    event Withdraw(address _recipient,uint256 _amount);
+
     /// records creation  of phases
     event PhaseCreated(
-        uint256 indexed index,
         bool isPublic,
         uint256 _minimunEntry,
         uint256 _price,
@@ -91,15 +92,14 @@ contract Sale is Ownable, Pausable {
 
     event Claims(address _buyer, uint256 _id);
 
-    constructor(
+    function initialize (
         uint256 _maxSupply,
         address _dispatcher,
         address _tokenAddress,
         address _chainLinkBNB_USD
-    ) {
+    ) public initializer {
         priceFeed = AggregatorV3Interface(_chainLinkBNB_USD);
         currentPhase = 0;
-        maxSupply = _maxSupply;
         supply = _maxSupply;
         dispatcher = _dispatcher;
         tokenAddress = _tokenAddress;
@@ -134,21 +134,15 @@ contract Sale is Ownable, Pausable {
         );
         require(supply >= _supply, "Not enough supply to mint");
         require(
-            ERC20(tokenAddress).transferFrom(
-                dispatcher,
-                address(this),
-                _supply
-            ),
+            ERC20(tokenAddress).allowance(dispatcher, address(this))>=_supply,
             "The token could not be transferred to the phase"
         );
-
         currentPhase++;
         Phase memory p = Phase(_isPublic,_minimunEntry,_price,_endAt,_supply,false,_timeLock);
         phases[currentPhase] = p;
     
 
         emit PhaseCreated(
-            totalPhase,
             _isPublic,
             _minimunEntry,
             _price,
@@ -172,8 +166,10 @@ contract Sale is Ownable, Pausable {
         }
     }
 
-      function removeWhitelistedAddress(address _account) public onlyOwner {
-        whitelist[_account] = false;
+      function removeWhitelistedAddress(address[] memory _accounts) public onlyOwner {
+          for (uint i=0; i<_accounts.length;i++) {
+        whitelist[_accounts[i]] = false;
+        }
     }
 
     /// @notice change account to transfer the contract balance
@@ -260,6 +256,7 @@ contract Sale is Ownable, Pausable {
     /// @notice withdraw eth
     function withdraw(address _account, uint256 _amount) external onlyOwner {
         payable(_account).transfer(_amount);
+        emit Withdraw(_account,_amount);
     }
 
     receive() external payable{}
