@@ -21,12 +21,11 @@ let mnemonic = process.env.MNEMONIC
 module.exports = {
   networks: {
     hardhat: {
-      // Uncomment these lines to use mainnet fork
-      // forking: {
-      //   enabled: true,
-      //   url: `https://eth-mainnet.alchemyapi.io/v2/Wg8E8VyQ80iNWoyXwWuSJO0UygiQjLWg`,
-      //   blockNumber: 11980054,
-      // },
+      forking: {
+        enabled: true,
+        url: `https://eth-mainnet.alchemyapi.io/v2/Wg8E8VyQ80iNWoyXwWuSJO0UygiQjLWg`,
+        blockNumber: 11980054,
+      },
     },
     testnet: {
       url: "https://data-seed-prebsc-2-s3.binance.org:8545",

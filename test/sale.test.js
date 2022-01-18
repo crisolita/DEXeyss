@@ -163,6 +163,21 @@ contract("Sale", ([owner, user, admin1, admin2]) => {
       ),
       "Not enough supply to mint"
     );
+
+    await expectRevert(
+      sale.createPhase(
+        true,
+        toBN(1),
+        1,
+        (await time.latest()) + 1,
+        maxSupply + 20,
+        25,
+        {
+          from: user,
+        }
+      ),
+      `AccessControl: account 0x70997970c51812dc3a010c7d01b50e0d17dc79c8 is missing role 0x0000000000000000000000000000000000000000000000000000000000000000`
+    );
   });
 
   it("Should release token in the rigth time", async function () {
@@ -304,7 +319,7 @@ contract("Sale", ([owner, user, admin1, admin2]) => {
 
     await expectRevert(
       sale.cancelPhase({ from: user }),
-      "Ownable: caller is not the owner"
+      "AccessControl: account 0x70997970c51812dc3a010c7d01b50e0d17dc79c8 is missing role 0x0000000000000000000000000000000000000000000000000000000000000000"
     );
 
     await sale.cancelPhase({ from: owner });

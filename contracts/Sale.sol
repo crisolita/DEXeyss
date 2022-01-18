@@ -1,7 +1,7 @@
 //SPDX-License-Identifier: MIT
 pragma solidity ^0.8.7;
 
-import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
 import "hardhat/console.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/TokenTimelock.sol";
@@ -12,7 +12,11 @@ import "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.
 /// @title Sale
 /// @author crisolita
 /// @notice this contract allow create phases for mint token and transfer the funds
-contract Sale is Initializable, OwnableUpgradeable, ReentrancyGuardUpgradeable {
+contract Sale is
+	Initializable,
+	AccessControlUpgradeable,
+	ReentrancyGuardUpgradeable
+{
 	/// until amount N of token sold out or reaching a date or time is over
 
 	struct Phase {
@@ -38,6 +42,8 @@ contract Sale is Initializable, OwnableUpgradeable, ReentrancyGuardUpgradeable {
 	/// all phases (next, current and previous)
 	mapping(uint256 => Phase) public phases;
 
+	/// record the ids for users
+	mapping(address => uint256[]) public allIDSforUser;
 	// only the private wallets
 
 	mapping(address => bool) private whitelist;
@@ -90,7 +96,8 @@ contract Sale is Initializable, OwnableUpgradeable, ReentrancyGuardUpgradeable {
 		address _tokenAddress,
 		address _chainLinkBNB_USD
 	) public initializer {
-		__Ownable_init();
+		__AccessControl_init();
+		_setupRole(DEFAULT_ADMIN_ROLE, _msgSender());
 		priceFeed = AggregatorV3Interface(_chainLinkBNB_USD);
 		currentPhase = 0;
 		tokensRemainForSale = _maxSupply;
@@ -148,6 +155,7 @@ contract Sale is Initializable, OwnableUpgradeable, ReentrancyGuardUpgradeable {
 			);
 
 			tokenLocksForSale[id] = timelockForSale;
+			allIDSforUser[msg.sender].push(id);
 		} else {
 			ERC20Upgradeable(tokenAddress).transfer(msg.sender, _tokenAmount);
 		}
@@ -176,7 +184,27 @@ contract Sale is Initializable, OwnableUpgradeable, ReentrancyGuardUpgradeable {
 		emit Claims(msg.sender, _id);
 	}
 
-	///@notice view functions
+	///@notice VIEW FUNCTIONS
+
+	///@dev see the tokens lock and id for every user
+	function getIDs(address _address) public view returns (uint256[] memory) {
+		return allIDSforUser[_address];
+	}
+
+	///@dev
+	function showMyShops(uint256 _id, address _myAddress)
+		public
+		view
+		returns (uint256, uint256)
+	{
+		require(_myAddress == tokenLocksForSale[_id].beneficiary());
+		return (
+			tokenLocksForSale[_id].releaseTime(),
+			IERC20(tokenAddress).balanceOf(address(tokenLocksForSale[_id]))
+		);
+	}
+
+	///@dev see the amount of token lock
 
 	///@dev get the usd/BNB price
 	function getLatestPrice() public view returns (uint256) {
@@ -199,7 +227,7 @@ contract Sale is Initializable, OwnableUpgradeable, ReentrancyGuardUpgradeable {
 		uint256 _endAt,
 		uint256 _supply,
 		uint256 _timeLock
-	) external onlyOwner {
+	) external onlyRole(DEFAULT_ADMIN_ROLE) {
 		if (block.timestamp > phases[currentPhase].endAt) {
 			phases[currentPhase].over = true;
 		}
@@ -244,12 +272,15 @@ contract Sale is Initializable, OwnableUpgradeable, ReentrancyGuardUpgradeable {
 	}
 
 	/// @notice change account to transfer the contract balance
-	function changeDispatcher(address _dispatcher) external onlyOwner {
+	function changeDispatcher(address _dispatcher)
+		external
+		onlyRole(DEFAULT_ADMIN_ROLE)
+	{
 		emit DispatcherChange(_dispatcher);
 		dispatcher = _dispatcher;
 	}
 
-	function cancelPhase() external onlyOwner {
+	function cancelPhase() external onlyRole(DEFAULT_ADMIN_ROLE) {
 		require(
 			phases[currentPhase].over == false,
 			"This phase is over, wait for the next"
@@ -265,7 +296,10 @@ contract Sale is Initializable, OwnableUpgradeable, ReentrancyGuardUpgradeable {
 		emit PhaseOver(true);
 	}
 
-	function addToWhitelist(address[] memory _accounts) public onlyOwner {
+	function addToWhitelist(address[] memory _accounts)
+		public
+		onlyRole(DEFAULT_ADMIN_ROLE)
+	{
 		for (uint256 i = 0; i < _accounts.length; i++) {
 			whitelist[_accounts[i]] = true;
 		}
@@ -273,7 +307,7 @@ contract Sale is Initializable, OwnableUpgradeable, ReentrancyGuardUpgradeable {
 
 	function removeWhitelistedAddress(address[] memory _accounts)
 		public
-		onlyOwner
+		onlyRole(DEFAULT_ADMIN_ROLE)
 	{
 		for (uint256 i = 0; i < _accounts.length; i++) {
 			whitelist[_accounts[i]] = false;
@@ -282,12 +316,18 @@ contract Sale is Initializable, OwnableUpgradeable, ReentrancyGuardUpgradeable {
 
 	///@notice  set chainlink address
 
-	function setChainlinkAddress(address _newChainlinkAddres) public onlyOwner {
+	function setChainlinkAddress(address _newChainlinkAddres)
+		public
+		onlyRole(DEFAULT_ADMIN_ROLE)
+	{
 		priceFeed = AggregatorV3Interface(_newChainlinkAddres);
 	}
 
 	///@dev change the end date's phase
-	function changeEndDate(uint256 _newEndDate) public onlyOwner {
+	function changeEndDate(uint256 _newEndDate)
+		public
+		onlyRole(DEFAULT_ADMIN_ROLE)
+	{
 		require(block.timestamp < _newEndDate);
 		phases[currentPhase].endAt = _newEndDate;
 	}
@@ -295,7 +335,7 @@ contract Sale is Initializable, OwnableUpgradeable, ReentrancyGuardUpgradeable {
 	/// @notice withdraw eth
 	function withdraw(address _account, uint256 _amount)
 		external
-		onlyOwner
+		onlyRole(DEFAULT_ADMIN_ROLE)
 		nonReentrant
 	{
 		payable(_account).transfer(_amount);
