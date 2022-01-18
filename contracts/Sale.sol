@@ -1,265 +1,306 @@
 //SPDX-License-Identifier: MIT
 pragma solidity ^0.8.7;
 
-import "@openzeppelin/contracts/access/Ownable.sol";
-import "@openzeppelin/contracts/security/Pausable.sol";
-import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
 import "hardhat/console.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/TokenTimelock.sol";
 import "@chainlink/contracts/src/v0.8/interfaces/AggregatorV3Interface.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
-
-
+import "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol";
 
 /// @title Sale
 /// @author crisolita
 /// @notice this contract allow create phases for mint token and transfer the funds
-contract Sale is Ownable, Pausable, Initializable  {
-    /// until amount N of token sold out or reaching a date or time is over
-    /// @dev a phase is always needed to mint
+contract Sale is Initializable, OwnableUpgradeable, ReentrancyGuardUpgradeable {
+	/// until amount N of token sold out or reaching a date or time is over
 
-    struct Phase {
-        // bool is the phase publici
-        bool isPublic;
-        // uint minimum amount of token
-        uint256 minimunEntry;
-        // uint price in usd
-        uint256 price;
-        // timestamp when this phase ends
-        uint256 endAt;
-        // uint that decreases when sold in phase
-        // @note to know the original supply look up in logs
-        uint256 supply;
-        // mark as finished the phase
-        bool over;
-        //time in days for lock tokens
-        uint256 time;
-    }
+	struct Phase {
+		// bool is the phase publici
+		bool isPublic;
+		// uint minimum amount of token
+		uint256 minimunEntry;
+		// uint price in usd
+		uint256 price;
+		// timestamp when this phase ends
+		uint256 endAt;
+		// uint that decreases when sold in phase
+		// @note to know the original supply look up in logs
+		uint256 supply;
+		// mark as finished the phase
+		bool over;
+		//time in days for lock tokens
+		uint256 timelock;
+	}
 
-    AggregatorV3Interface private priceFeed;
+	AggregatorV3Interface private priceFeed;
 
+	/// all phases (next, current and previous)
+	mapping(uint256 => Phase) public phases;
 
-    /// all phases (next, current and previous)
-    mapping(uint256 => Phase) public phases;
+	// only the private wallets
 
-    // only the private wallets
- 
-    mapping(address => bool ) private whitelist;
+	mapping(address => bool) private whitelist;
 
-    //address with amount and time for timelock 
+	//address with amount and time for timelock
 
-    mapping(uint256 => TokenTimelock) public tokenLock; 
+	mapping(uint256 => TokenTimelock) public tokenLocksForSale;
 
-    /// reference for the mapping of phases, uint of the current phase
-    uint256 public currentPhase;
+	/// reference for the mapping of phases, uint of the current phase
+	uint256 public currentPhase;
 
-    //  ID for every sale 
+	//  ID for every sale
 
-    uint256 public id;
-    /// reference for the mapping of phases, uint of the total phase
+	uint256 public id;
+	/// reference for the mapping of phases, uint of the total phase
 
-    /// @notice max amount of token allowed to sell in this contract
-    uint256 public maxSupply;
+	/// @notice current amount of tokens
+	uint256 public tokensRemainForSale;
 
-    
-    /// @notice current amount of tokens 
-    uint256 public supply;
+	/// @notice wallet to transfer funds of the contract
+	address public dispatcher;
 
-    /// @notice wallet to transfer funds of the contract
-    address public dispatcher;
+	/// @notice address the token that user buys
+	address public tokenAddress;
 
-    /// @notice address the token that user buys
-    address public tokenAddress;
+	/// records the changes of the wallet where the tokens are transferred
+	event DispatcherChange(address indexed _dispatcher);
 
-    /// records the changes of the wallet where the tokens are transferred
-    event DispatcherChange(address indexed _dispatcher);
+	/// records the token transfers made by the contract
+	event Purchase(address indexed _account, uint256 _amount, uint256 _id);
 
-    /// records the token transfers made by the contract
-    event Purchase(address indexed _account, uint256 _amount,uint256 _id);
+	//event to control withdraw
+	event Withdraw(address _recipient, uint256 _amount);
 
-    //event to control withdraw
-    event Withdraw(address _recipient,uint256 _amount);
+	/// records creation  of phases
+	event PhaseCreated(
+		bool isPublic,
+		uint256 _minimunEntry,
+		uint256 _price,
+		uint256 _endAt,
+		uint256 _supply
+	);
+	event PhaseOver(bool _over);
 
-    /// records creation  of phases
-    event PhaseCreated(
-        bool isPublic,
-        uint256 _minimunEntry,
-        uint256 _price,
-        uint256 _endAt,
-        uint256 _supply
-    );
-    event PhaseOver(bool _over);
+	event Claims(address _buyer, uint256 _id);
 
-    event Claims(address _buyer, uint256 _id);
+	function initialize(
+		uint256 _maxSupply,
+		address _dispatcher,
+		address _tokenAddress,
+		address _chainLinkBNB_USD
+	) public initializer {
+		__Ownable_init();
+		priceFeed = AggregatorV3Interface(_chainLinkBNB_USD);
+		currentPhase = 0;
+		tokensRemainForSale = _maxSupply;
+		dispatcher = _dispatcher;
+		tokenAddress = _tokenAddress;
+		phases[currentPhase].over = true;
+	}
 
-    function initialize (
-        uint256 _maxSupply,
-        address _dispatcher,
-        address _tokenAddress,
-        address _chainLinkBNB_USD
-    ) public initializer {
-        priceFeed = AggregatorV3Interface(_chainLinkBNB_USD);
-        currentPhase = 0;
-        supply = _maxSupply;
-        dispatcher = _dispatcher;
-        tokenAddress = _tokenAddress;
-        phases[currentPhase].over = true;
-    }
+	//receive a bool and make the access possible
+	modifier isPublicSale() {
+		if (!phases[currentPhase].isPublic) {
+			require(whitelist[msg.sender], "This phase is private");
+		}
+		_;
+	}
 
-    //receive a bool and make the access possible
-    modifier isPublic() {
-       if(!phases[currentPhase].isPublic) {
-            require(whitelist[msg.sender], "This phase is private");
-       }
-        _;
+	/// @notice mint tokens, require send ETH/BNB
+	function buyToken(uint256 _tokenAmount)
+		external
+		payable
+		isPublicSale
+		nonReentrant
+	{
+		require(
+			block.timestamp < phases[currentPhase].endAt,
+			"This phase is over, wait for the next"
+		);
 
-    }
+		require(
+			phases[currentPhase].supply >= _tokenAmount,
+			"Not enough supply"
+		);
 
-    /// @notice add a phase to mapping
-    function createPhase(
-        bool _isPublic,
-        uint256 _minimunEntry,
-        uint256 _price,
-        uint256 _endAt,
-        uint256 _supply,
-        uint256 _timeLock
-    ) external onlyOwner {
-         if (block.timestamp > phases[currentPhase].endAt) {
-            phases[currentPhase].over = true;
-            }
-        require(phases[currentPhase].over,"This phase isn't over");
-        require(
-            block.timestamp < _endAt,
-            "The end of the phase should be greater than now"
-        );
-        require(supply >= _supply, "Not enough supply to mint");
-        require(
-            ERC20(tokenAddress).allowance(dispatcher, address(this))>=_supply,
-            "The token could not be transferred to the phase"
-        );
-        currentPhase++;
-        Phase memory p = Phase(_isPublic,_minimunEntry,_price,_endAt,_supply,false,_timeLock);
-        phases[currentPhase] = p;
-    
+		require(
+			_tokenAmount >= phases[currentPhase].minimunEntry,
+			"There are too few tokens"
+		);
 
-        emit PhaseCreated(
-            _isPublic,
-            _minimunEntry,
-            _price,
-            _endAt,
-            _supply
-        );
-    }
+		uint256 finalPrice =
+			(_tokenAmount * phases[currentPhase].price) / (getLatestPrice());
 
-    function cancelPhase() external onlyOwner{
-          require(
-            phases[currentPhase].over == false,
-            "This phase is over, wait for the next"
-        );
-        phases[currentPhase].over = true;
-        emit PhaseOver(true);
-    }
+		require(finalPrice <= msg.value, "Not enough ETH/BNB");
 
-    function addToWhitelist(address[] memory _accounts) public onlyOwner {
-        for (uint i=0; i<_accounts.length;i++) {
-        whitelist[_accounts[i]] = true;
-        }
-    }
+		id++;
+		if (phases[currentPhase].timelock > 0) {
+			TokenTimelock timelockForSale =
+				new TokenTimelock(
+					IERC20(tokenAddress),
+					msg.sender,
+					block.timestamp + phases[currentPhase].timelock
+				);
+			ERC20Upgradeable(tokenAddress).transfer(
+				address(timelockForSale),
+				_tokenAmount
+			);
 
-      function removeWhitelistedAddress(address[] memory _accounts) public onlyOwner {
-          for (uint i=0; i<_accounts.length;i++) {
-        whitelist[_accounts[i]] = false;
-        }
-    }
+			tokenLocksForSale[id] = timelockForSale;
+		} else {
+			ERC20Upgradeable(tokenAddress).transfer(msg.sender, _tokenAmount);
+		}
 
-    /// @notice change account to transfer the contract balance
-    function changeDispatcher(address _dispatcher) external onlyOwner {
-        emit DispatcherChange(_dispatcher);
-        dispatcher = _dispatcher;
-    }
- 
-    ///@dev get the usd/BNB price
-      function getLatestPrice() public view returns (uint256) {
-    (, int256 price, , , ) = priceFeed.latestRoundData();
-        return uint256(price)*10**10;
-    }
+		/// change current phase total supply
+		phases[currentPhase].supply -= _tokenAmount;
 
-    /// @notice mint tokens, require send ETH/BNB
-    function buyToken(uint256 _tokenAmount)
-        external
-        payable
-        whenNotPaused
-        isPublic
-    {
-          require(
-           block.timestamp < phases[currentPhase].endAt,
-            "This phase is over, wait for the next"
-        );
+		if (phases[currentPhase].supply == 0) {
+			phases[currentPhase].over = true;
+			emit PhaseOver(true);
+		}
 
+		tokensRemainForSale -= _tokenAmount;
 
-        require(
-            phases[currentPhase].supply >= _tokenAmount,
-            "Not enough supply"
-        );
+		emit Purchase(msg.sender, _tokenAmount, id);
+	}
 
-        require(
-            _tokenAmount >= phases[currentPhase].minimunEntry,
-            "There are too few tokens"
-        );
+	//release the tokens at time
 
-    
-        uint256 finalPrice = _tokenAmount*phases[currentPhase].price/(getLatestPrice());
-       
-        require(finalPrice <= msg.value, "Not enough ETH/BNB");
+	function release(uint256 _id) public {
+		require(
+			msg.sender == tokenLocksForSale[_id].beneficiary(),
+			"This is not your id"
+		);
+		tokenLocksForSale[_id].release();
+		emit Claims(msg.sender, _id);
+	}
 
-        if (phases[currentPhase].time >0) {
-        TokenTimelock usertime = new TokenTimelock(IERC20(tokenAddress),msg.sender,block.timestamp + phases[currentPhase].time);
-        ERC20(tokenAddress).transferFrom(dispatcher,address(usertime),_tokenAmount);
+	///@notice view functions
 
-           id++;
-        tokenLock[id] = usertime;
+	///@dev get the usd/BNB price
+	function getLatestPrice() public view returns (uint256) {
+		(, int256 price, , , ) = priceFeed.latestRoundData();
+		return uint256(price) * 10**10;
+	}
 
-        } else {
-            ERC20(tokenAddress).transferFrom(dispatcher,msg.sender, _tokenAmount);
-            id++;
-        }
-        
-        /// change current phase total supply
-        phases[currentPhase].supply -= _tokenAmount;
-        /// advance phase if the supply is out
-        if (phases[currentPhase].supply == 0) {
-            phases[currentPhase].over = true;
-            emit PhaseOver(true);
-        }
+	/// @notice get ongoing phase or the last phase over
+	function getcurrentPhase() external view returns (Phase memory) {
+		return phases[currentPhase];
+	}
 
-        supply-=_tokenAmount;
+	///@notice ONLYOWNER FUNCTIONS
 
-        emit Purchase(msg.sender, _tokenAmount,id);
-    }
+	/// @notice add a phase to mapping
+	function createPhase(
+		bool _isPublic,
+		uint256 _minimunEntry,
+		uint256 _price,
+		uint256 _endAt,
+		uint256 _supply,
+		uint256 _timeLock
+	) external onlyOwner {
+		if (block.timestamp > phases[currentPhase].endAt) {
+			phases[currentPhase].over = true;
+		}
+		require(phases[currentPhase].over, "This phase isn't over");
+		if (phases[currentPhase].supply > 0) {
+			IERC20(tokenAddress).transfer(
+				dispatcher,
+				phases[currentPhase].supply
+			);
+		}
+		require(
+			block.timestamp < _endAt,
+			"The end of the phase should be greater than now"
+		);
+		require(
+			_supply > _minimunEntry,
+			"Supply should be greater than minimum entry"
+		);
+		require(tokensRemainForSale >= _supply, "Not enough supply to mint");
+		require(
+			IERC20(tokenAddress).transferFrom(
+				dispatcher,
+				address(this),
+				_supply
+			),
+			"The token could not be transferred to the phase"
+		);
+		currentPhase++;
+		Phase memory p =
+			Phase(
+				_isPublic,
+				_minimunEntry,
+				_price,
+				_endAt,
+				_supply,
+				false,
+				_timeLock
+			);
+		phases[currentPhase] = p;
 
- 
-    /// @notice get ongoing phase or the last phase over
-    function getcurrentPhase() external view returns (Phase memory) {
-        return phases[currentPhase];
-    }
+		emit PhaseCreated(_isPublic, _minimunEntry, _price, _endAt, _supply);
+	}
 
-    /// @notice get contract balance
+	/// @notice change account to transfer the contract balance
+	function changeDispatcher(address _dispatcher) external onlyOwner {
+		emit DispatcherChange(_dispatcher);
+		dispatcher = _dispatcher;
+	}
 
-    //release the tokens at time
+	function cancelPhase() external onlyOwner {
+		require(
+			phases[currentPhase].over == false,
+			"This phase is over, wait for the next"
+		);
+		if (phases[currentPhase].supply > 0) {
+			IERC20(tokenAddress).transfer(
+				dispatcher,
+				phases[currentPhase].supply
+			);
+			phases[currentPhase].supply = 0;
+		}
+		phases[currentPhase].over = true;
+		emit PhaseOver(true);
+	}
 
-    function release(uint256 _id) public {
-        require(msg.sender == tokenLock[_id].beneficiary(), "This is not your id");
-        tokenLock[_id].release();
-        emit Claims(msg.sender,_id);
-    }
+	function addToWhitelist(address[] memory _accounts) public onlyOwner {
+		for (uint256 i = 0; i < _accounts.length; i++) {
+			whitelist[_accounts[i]] = true;
+		}
+	}
 
-    /// @notice withdraw eth
-    function withdraw(address _account, uint256 _amount) external onlyOwner {
-        payable(_account).transfer(_amount);
-        emit Withdraw(_account,_amount);
-    }
+	function removeWhitelistedAddress(address[] memory _accounts)
+		public
+		onlyOwner
+	{
+		for (uint256 i = 0; i < _accounts.length; i++) {
+			whitelist[_accounts[i]] = false;
+		}
+	}
 
-    receive() external payable{}
+	///@notice  set chainlink address
 
-   
+	function setChainlinkAddress(address _newChainlinkAddres) public onlyOwner {
+		priceFeed = AggregatorV3Interface(_newChainlinkAddres);
+	}
+
+	///@dev change the end date's phase
+	function changeEndDate(uint256 _newEndDate) public onlyOwner {
+		require(block.timestamp < _newEndDate);
+		phases[currentPhase].endAt = _newEndDate;
+	}
+
+	/// @notice withdraw eth
+	function withdraw(address _account, uint256 _amount)
+		external
+		onlyOwner
+		nonReentrant
+	{
+		payable(_account).transfer(_amount);
+		emit Withdraw(_account, _amount);
+	}
+
+	receive() external payable {}
 }

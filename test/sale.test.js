@@ -1,8 +1,8 @@
-const IStakeContract = require('./IStakingRewards.json')
+const IStakeContract = require("./IStakingRewards.json");
 const { artifacts } = require("hardhat");
 const Sale = artifacts.require("Sale");
 const StakingRewardsFactory = artifacts.require("StakingRewardsFactory");
-const Token = artifacts.require("Token");
+const Token = artifacts.require("BBCNToken");
 const { Provider } = require("@ethersproject/abstract-provider");
 
 /**Token deployed to: 0xaB97b0eEA567Bf8c5eEC65DE489F8faeF13646Af
@@ -18,11 +18,11 @@ const {
 } = require("@openzeppelin/test-helpers");
 const { web3 } = require("@openzeppelin/test-helpers/src/setup");
 const { expect } = require("chai");
-const { latest } = require('@openzeppelin/test-helpers/src/time');
+const { latest } = require("@openzeppelin/test-helpers/src/time");
 
 const BNB = "0xb8c77482e45f1f44de1745f52c74426c631bdd52";
 
-// this function include the desimals
+// this function include the decimals
 toBN = (num) => web3.utils.toBN(num + "0".repeat(18));
 
 toWei = (num) => web3.utils.toWei(num);
@@ -34,19 +34,19 @@ contract("Sale", ([owner, user, admin1, admin2]) => {
   beforeEach(async function () {
     const maxSupply = toBN(10000);
     const chainLinkAddress = "0x14e613AC84a31f709eadbdF89C6CC390fDc9540A";
-    token = await Token.new();
-    sale = await Sale.new();
-    sale.initialize(maxSupply, owner, token.address,chainLinkAddress,{
+    token = await Token.new({ from: owner });
+    sale = await Sale.new({ from: owner });
+    sale.initialize(maxSupply, owner, token.address, chainLinkAddress, {
       from: owner,
-    })
-    genesis = await time.latest()+1;
-    factory = await StakingRewardsFactory.new(token.address,genesis);
+    });
+    genesis = (await time.latest()) + 1;
+    factory = await StakingRewardsFactory.new(token.address, genesis);
 
-    await token.mint(maxSupply, { from: owner });
+    await token.mint(owner, maxSupply, { from: owner });
     await token.approve(sale.address, maxSupply, { from: owner });
   });
   it("Create first phase", async function () {
-    const price = '5' /** 5$ per token*/,
+    const price = "5" /** 5$ per token*/,
       min = toBN(2);
     (supply = toBN(5000)),
       (dateEndPhase =
@@ -67,7 +67,10 @@ contract("Sale", ([owner, user, admin1, admin2]) => {
     const phase = await sale.phases(1);
 
     /** checking that the phase is created */
-    expect(phase.price.toString()).to.equal(price.toString(), "Phase price err");
+    expect(phase.price.toString()).to.equal(
+      price.toString(),
+      "Phase price err"
+    );
     expect(Number(phase.minimunEntry)).to.equal(
       Number(min),
       "Phase minimunEntry err"
@@ -79,8 +82,8 @@ contract("Sale", ([owner, user, admin1, admin2]) => {
     expect(Number(phase.supply)).to.equal(Number(supply), "Phase supply err");
   });
   it("Create first phase, buy tokens, cancel phase (by owner) and created another phase to buy", async function () {
-    const price = toBN(5)/** toBN(5) per TOKEN */,
-      min = toBN(2); 
+    const price = toBN(5) /** toBN(5) per TOKEN */,
+      min = toBN(2);
     (supply = toBN(500)),
       (dateEndPhase =
         Number(await time.latest()) + 3600) /** the phase will last one hour */;
@@ -97,55 +100,39 @@ contract("Sale", ([owner, user, admin1, admin2]) => {
       }
     );
 
-
-      await expectRevert(sale.createPhase(
-        true,
-        min,
-        price,
-        dateEndPhase,
-        supply,
-        25,
-        {
-          from: owner,
-        }
-      ),"This phase isn't over")
-    expect((await token.balanceOf(user)).toString()).to.equal('0');
-    await sale.buyToken(toBN(25),{from: user,value: toBN(1) });
-
-   await sale.cancelPhase();
-
-    await sale.createPhase(
-      true,
-      min,
-      price,
-      dateEndPhase,
-      supply,
-      0,
-      {
+    await expectRevert(
+      sale.createPhase(true, min, price, dateEndPhase, supply, 25, {
         from: owner,
-      }
+      }),
+      "This phase isn't over"
     );
+    expect((await token.balanceOf(user)).toString()).to.equal("0");
+    await sale.buyToken(toBN(25), { from: user, value: toBN(1) });
 
-    await sale.buyToken(toBN(25),{from: user, value:toBN(5)});
+    await sale.cancelPhase();
 
-    expect((await token.balanceOf(user)).toString()).to.equal(toBN(25).toString());
+    await sale.createPhase(true, min, price, dateEndPhase, supply, 0, {
+      from: owner,
+    });
 
+    await sale.buyToken(toBN(25), { from: user, value: toBN(5) });
+
+    expect((await token.balanceOf(user)).toString()).to.equal(
+      toBN(25).toString()
+    );
 
     await time.increase(time.duration.days(2));
 
-    await sale.release(1,{from: user});
+    await sale.release(1, { from: user });
 
-
-    expect((await token.balanceOf(user)).toString()).to.equal(toBN(50).toString());
-
-
-
+    expect((await token.balanceOf(user)).toString()).to.equal(
+      toBN(50).toString()
+    );
   });
 
   it("Errors creating phases", async function () {
-
     const maxSupply = toBN(1000);
-   
+
     /// err end date is now less one second
     await expectRevert(
       sale.createPhase(
@@ -174,7 +161,8 @@ contract("Sale", ([owner, user, admin1, admin2]) => {
           from: owner,
         }
       ),
-      "Not enough supply to mint");
+      "Not enough supply to mint"
+    );
   });
 
   it("Should release token in the rigth time", async function () {
@@ -186,17 +174,9 @@ contract("Sale", ([owner, user, admin1, admin2]) => {
         time.duration.days(10)) /** the phase will last one hour */,
       (timeLock = 3600);
 
-    await sale.createPhase(
-      true,
-      min,
-      price,
-      dateEndPhase,
-      supply,
-      timeLock,
-      {
-        from: owner,
-      }
-    );
+    await sale.createPhase(true, min, price, dateEndPhase, supply, timeLock, {
+      from: owner,
+    });
 
     const currentPhaseNumber = Number(await sale.currentPhase());
 
@@ -209,7 +189,7 @@ contract("Sale", ([owner, user, admin1, admin2]) => {
 
     await sale.buyToken(toBN("400"), {
       from: user,
-      value: toWei('162'),
+      value: toWei("162"),
     });
 
     await expectRevert(
@@ -248,30 +228,22 @@ contract("Sale", ([owner, user, admin1, admin2]) => {
       min = toBN(2),
       price = toBN(5);
 
-    await sale.createPhase(
-      isPublic,
-      min,
-      price,
-      dateEndPhase,
-      supply,
-      25,
-      { from: owner }
-    );
+    await sale.createPhase(isPublic, min, price, dateEndPhase, supply, 25, {
+      from: owner,
+    });
 
     const currentPhaseNumber = await sale.currentPhase();
 
     amountOfTokens = toBN(3);
 
     // call the ETH/BNB needed to this operation
-    const ethNeeded =
-    price.mul(supply).div(await sale.getLatestPrice());    
-    
+    const ethNeeded = price.mul(supply).div(await sale.getLatestPrice());
 
     // / err not enought ETH/BNB
     await expectRevert(
       sale.buyToken((await sale.phases(currentPhaseNumber)).supply, {
         from: user,
-        value: ethNeeded-1,
+        value: ethNeeded - 1,
       }),
       "Not enough ETH/BNB"
     );
@@ -301,24 +273,16 @@ contract("Sale", ([owner, user, admin1, admin2]) => {
 
   it("Only the two admins can access to the private phase", async function () {
     const dateEndPhase = Number(await time.latest()) + time.duration.days(10),
-      supply = await sale.supply();
+      supply = await sale.tokensRemainForSale();
 
-    await sale.createPhase(
-      false,
-      toBN(2),
-      5,
-      dateEndPhase,
-      supply,
-      25,
-      {
-        from: owner,
-      }
-    );
+    await sale.createPhase(false, toBN(2), 5, dateEndPhase, supply, 25, {
+      from: owner,
+    });
 
     const currentPhaseNumber = Number(await sale.currentPhase());
 
     // add the admin to a whitelist
-    await sale.addToWhitelist([admin1,admin2]);
+    await sale.addToWhitelist([admin1, admin2]);
 
     // the ordinary user cannot buy because the phase is private
 
@@ -330,19 +294,11 @@ contract("Sale", ([owner, user, admin1, admin2]) => {
 
   it("Only owner can cancel the phase", async function () {
     const dateEndPhase = Number(await time.latest()) + time.duration.days(1),
-      supply = await sale.supply();
+      supply = await sale.tokensRemainForSale();
 
-    await sale.createPhase(
-      true,
-      toBN(2),
-      5,
-      dateEndPhase,
-      supply,
-      25,
-      {
-        from: owner,
-      }
-    );
+    await sale.createPhase(true, toBN(2), 5, dateEndPhase, supply, 25, {
+      from: owner,
+    });
 
     const currentPhaseNumber = Number(await sale.currentPhase());
 
@@ -365,15 +321,9 @@ contract("Sale", ([owner, user, admin1, admin2]) => {
       min = toBN(1),
       price = 10;
 
-    await sale.createPhase(
-      isPublic,
-      min,
-      price,
-      dateEndPhase,
-      supply,
-      25,
-      { from: owner }
-    );
+    await sale.createPhase(isPublic, min, price, dateEndPhase, supply, 25, {
+      from: owner,
+    });
 
     amountOfTokens = toBN(3);
 
@@ -387,7 +337,7 @@ contract("Sale", ([owner, user, admin1, admin2]) => {
   });
 
   it("Should recieve the purchase event and release event", async function () {
-    const  price = 278934 /** 278934$ per token*/,
+    const price = 278934 /** 278934$ per token*/,
       min = toBN("9");
     (supply = toBN(5000)),
       (dateEndPhase =
@@ -395,19 +345,11 @@ contract("Sale", ([owner, user, admin1, admin2]) => {
         time.duration.days(10)) /** the phase will last one hour */,
       (timeLock = 3600);
 
-    await sale.createPhase(
-      true,
-      min,
-      price,
-      dateEndPhase,
-      supply,
-      timeLock,
-      {
-        from: owner,
-      }
-    );
+    await sale.createPhase(true, min, price, dateEndPhase, supply, timeLock, {
+      from: owner,
+    });
 
-    const id = '1';
+    const id = "1";
 
     const shop = await sale.buyToken(toBN("10"), {
       from: user,
@@ -434,15 +376,9 @@ contract("Sale", ([owner, user, admin1, admin2]) => {
       min = toBN(1),
       price = 10;
 
-    await sale.createPhase(
-      isPublic,
-      min,
-      price,
-      dateEndPhase,
-      supply,
-      6800,
-      { from: owner }
-    );
+    await sale.createPhase(isPublic, min, price, dateEndPhase, supply, 6800, {
+      from: owner,
+    });
 
     amountOfTokens = toBN(3);
 
@@ -483,22 +419,15 @@ contract("Sale", ([owner, user, admin1, admin2]) => {
   });
 
   it("Users can stake their tokens and receive rewards", async function () {
-
     const dateEndPhase = Number(await time.latest()) + time.duration.days(5),
       supply = toBN(2500),
       isPublic = true,
       min = toBN(1),
       price = 10;
 
-    await sale.createPhase(
-      isPublic,
-      min,
-      price,
-      dateEndPhase,
-      supply,
-      6800,
-      { from: owner }
-    );
+    await sale.createPhase(isPublic, min, price, dateEndPhase, supply, 6800, {
+      from: owner,
+    });
 
     amountOfTokens = toBN(3);
 
@@ -518,45 +447,39 @@ contract("Sale", ([owner, user, admin1, admin2]) => {
     );
 
     const _stakingToken = token.address,
-      _rewardsAmount = toBN('50'),
-      _rewardsDuration = await time.latest() +500;
+      _rewardsAmount = toBN("50"),
+      _rewardsDuration = (await time.latest()) + 500;
 
-
-     await token.transfer(factory.address,toBN('50'));
+    await token.transfer(factory.address, toBN("50"));
     //the owner create the stake
     await factory.deploy(_stakingToken, _rewardsAmount, _rewardsDuration);
-    
-    await time.increaseTo(genesis+1);
 
-    await factory.notifyRewardAmounts({from: admin2});
+    await time.increaseTo(genesis + 1);
 
-
+    await factory.notifyRewardAmounts({ from: admin2 });
 
     const stk = (await factory.stakingRewardsInfoByStakingToken(token.address))
       .stakingRewards;
-    var  stakeContract =  new web3.eth.Contract(IStakeContract,stk.toString());
+    var stakeContract = new web3.eth.Contract(IStakeContract, stk.toString());
 
+    await token.approve(stk, toBN("2"), { from: user });
 
-    await token.approve(stk,toBN('2'),{from: user});
+    await stakeContract.methods.stake(toBN("2")).send({ from: user });
 
-    await stakeContract.methods.stake(toBN('2')).send({from: user});
-     
     await time.increase(time.duration.days(10));
-    
+
     const balanceOfUserBeforeClaim = await token.balanceOf(user);
 
-    const tx = await stakeContract.methods.getReward().send({from: user});
+    const tx = await stakeContract.methods.getReward().send({ from: user });
 
-    const earned = web3.utils.toBN(parseInt(tx.events[0].raw.data,16));
-    
+    const earned = web3.utils.toBN(parseInt(tx.events[0].raw.data, 16));
+
     const balanceOfUser = await token.balanceOf(user);
-    
 
-    expect(balanceOfUser.toString()).to.equal(balanceOfUserBeforeClaim.add(earned).toString());
+    expect(balanceOfUser.toString()).to.equal(
+      balanceOfUserBeforeClaim.add(earned).toString()
+    );
 
-    const now = await time.latest() + time.duration.minutes(8);
-
-   
-}); 
-
+    const now = (await time.latest()) + time.duration.minutes(8);
+  });
 });
