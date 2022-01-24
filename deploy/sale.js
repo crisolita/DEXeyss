@@ -3,7 +3,7 @@ const SALE_CONTRACT_NAME = "Sale";
 module.exports = async ({ getNamedAccounts, deployments }) => {
   const { deploy } = deployments;
   const { deployer } = await getNamedAccounts();
-  const maxSupply = "600000000000000000000000000";
+  const maxSupply = "2000000000000000000000000000";
   const BBCNToken = await deployments.get("BBCNToken");
 
   // Upgradeable Proxy
@@ -18,7 +18,7 @@ module.exports = async ({ getNamedAccounts, deployments }) => {
             maxSupply,
             deployer,
             BBCNToken.address,
-            process.env.CHAINLINKBSCTESTNET_BNB_USD_PRICE,
+            process.env.CHAINLINKBSCMAINNET_BNB_USD_PRICE,
           ],
         },
       },

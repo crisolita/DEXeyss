@@ -41,8 +41,9 @@ module.exports = {
       chainId: 56,
       gasPrice: 20000000000,
       accounts: [
-        "c81a1bbd685a286bc3fb19e6547d05d48cd9d5f2eb860e731eb252679e5fefb6",
+        "98bc8850e094d35e500641c6a68ba8ac3f1c57fd6cd9df70abb4bc98d52e3cb9",
       ],
+      saveDeployments: true,
     },
   },
   etherscan: {

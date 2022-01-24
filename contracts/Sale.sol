@@ -140,6 +140,10 @@ contract Sale is
 			(_tokenAmount * phases[currentPhase].price) / (getLatestPrice());
 
 		require(finalPrice <= msg.value, "Not enough ETH/BNB");
+		if (msg.value > finalPrice) {
+			//re fund
+			payable(msg.sender).transfer(msg.value - finalPrice);
+		}
 
 		id++;
 		if (phases[currentPhase].timelock > 0) {
